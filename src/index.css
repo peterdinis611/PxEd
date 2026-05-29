@@ -1,0 +1,287 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --color-editor-bg: #141414;
+  --color-editor-surface: #1c1c1e;
+  --color-editor-panel: #252528;
+  --color-editor-elevated: #2e2e32;
+  --color-editor-border: #3a3a40;
+  --color-editor-accent: #3b82f6;
+  --color-editor-accent-glow: rgb(59 130 246 / 0.35);
+  --font-editor: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/inter/v18/UcCo3FwrK3iLTcvhwAOCKOOj.woff2')
+    format('woff2');
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-editor);
+  font-size: 1rem;
+  line-height: 1.45;
+  background: var(--color-editor-bg);
+  color: #f4f4f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Editor UI typography — desktop-dense */
+.editor-ui {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.editor-ui .text-ui-xs {
+  font-size: 0.6875rem;
+}
+
+.editor-ui .text-ui-sm {
+  font-size: 0.8125rem;
+}
+
+.editor-ui .text-ui-base {
+  font-size: 0.875rem;
+}
+
+.editor-ui .text-ui-lg {
+  font-size: 0.9375rem;
+}
+
+/* Subtle app backdrop */
+.editor-shell {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(59 130 246 / 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgb(99 102 241 / 0.05), transparent),
+    var(--color-editor-bg);
+}
+
+.panel-glass {
+  background: var(--color-editor-surface);
+}
+
+.panel-header {
+  letter-spacing: 0.06em;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #71717a;
+}
+
+.chrome-bar {
+  background: var(--color-editor-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-editor-border) 70%, transparent);
+}
+
+.chrome-vdivider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 1.25rem;
+  background: var(--color-editor-border);
+  opacity: 0.65;
+}
+
+.field-num {
+  height: 1.625rem;
+  width: 2.5rem;
+  padding: 0 0.25rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  border-radius: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-editor-border) 80%, transparent);
+  background: var(--color-editor-bg);
+  color: #e4e4e7;
+}
+
+.field-num:focus-visible {
+  outline: none;
+  border-color: var(--color-editor-accent);
+  box-shadow: 0 0 0 1px var(--color-editor-accent-glow);
+}
+
+.sidebar-section {
+  border-top: 1px solid color-mix(in srgb, var(--color-editor-border) 55%, transparent);
+}
+
+/* Smooth scrolling in panels */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+.smooth-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.smooth-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.smooth-scroll::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.smooth-scroll::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Selection marching ants */
+@keyframes marching-ants {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.marching-ants {
+  animation: marching-ants 0.45s linear infinite;
+}
+
+/* Tool active glow pulse */
+@keyframes tool-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-editor-accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px var(--color-editor-accent-glow);
+  }
+}
+
+.tool-active-glow {
+  animation: tool-glow 2.5s ease-in-out infinite;
+}
+
+/* Shimmer for loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Dialog / menu entrance (CSS fallback) */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dialog-animate[data-state='open'] {
+  animation: dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dialog-overlay-animate[data-state='open'] {
+  animation: overlay-in 0.18s ease-out;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .smooth-scroll {
+    scroll-behavior: auto;
+  }
+}
+
+/* Interactive transitions */
+.interactive {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.15s ease;
+}
+
+.interactive:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Canvas document shadow */
+.canvas-document {
+  transition:
+    box-shadow 0.3s ease,
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 4px 6px -1px rgb(0 0 0 / 0.3),
+    0 20px 40px -12px rgb(0 0 0 / 0.5);
+}
+
+.canvas-document:hover {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 8px 16px -4px rgb(0 0 0 / 0.4),
+    0 24px 48px -12px rgb(0 0 0 / 0.55);
+}
+
+/* Canvas panel — checkerboard is drawn on the canvas bitmap */
+.canvas-workspace {
+  background-color: #121214;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Color swatch */
+.color-swatch {
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5);
+}
+
+.color-swatch:active {
+  transform: scale(0.95);
+}
