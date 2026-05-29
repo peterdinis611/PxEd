@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { ColorPicker } from '@/components/editor/ColorPicker'
 import { useEditor } from '@/context/EditorContext'
 import { fadeSlideRight } from '@/lib/motion'
 import type { ToolName } from '@/types/editor'
@@ -126,6 +127,14 @@ export function OptionsBar() {
     }>,
   ) => dispatch({ type: 'SET_MISC_TOOL', patch })
 
+  const setColor = (which: 'fg' | 'bg', color: string) => {
+    dispatch({
+      type: 'SET_COLORS',
+      ...(which === 'fg' ? { fg: color } : { bg: color }),
+    })
+    dispatch({ type: 'ADD_RECENT_COLOR', color })
+  }
+
   return (
     <div className="chrome-bar w-full px-2 py-1.5">
       <div className="flex min-h-[2rem] items-center gap-2">
@@ -140,17 +149,54 @@ export function OptionsBar() {
 
         <span className="chrome-vdivider" aria-hidden />
 
-        <div className="flex shrink-0 items-center gap-1.5" title="Foreground / Background">
-          <span
-            className="h-4 w-4 rounded-sm border border-zinc-600"
-            style={{ backgroundColor: state.foregroundColor }}
-            title={`FG ${state.foregroundColor}`}
-          />
-          <span
-            className="h-4 w-4 rounded-sm border border-zinc-600"
-            style={{ backgroundColor: state.backgroundColor }}
-            title={`BG ${state.backgroundColor}`}
-          />
+        <div className="flex shrink-0 items-center gap-1">
+          <ColorPicker
+            color={state.foregroundColor}
+            onChange={(c) => setColor('fg', c)}
+            recentColors={state.recentColors}
+            label="Popredie (FG)"
+          >
+            <button
+              type="button"
+              className="flex h-7 items-center gap-1.5 rounded border border-zinc-600 bg-zinc-900/50 px-1.5 hover:border-zinc-500"
+            >
+              <span
+                className="h-4 w-4 shrink-0 rounded-sm border border-zinc-600"
+                style={{ backgroundColor: state.foregroundColor }}
+              />
+              <span className="font-mono text-[10px] uppercase text-zinc-400">
+                {state.foregroundColor}
+              </span>
+            </button>
+          </ColorPicker>
+          <ColorPicker
+            color={state.backgroundColor}
+            onChange={(c) => setColor('bg', c)}
+            recentColors={state.recentColors}
+            label="Pozadie (BG)"
+          >
+            <button
+              type="button"
+              className="flex h-7 items-center gap-1.5 rounded border border-zinc-600 bg-zinc-900/50 px-1.5 hover:border-zinc-500"
+            >
+              <span
+                className="h-4 w-4 shrink-0 rounded-sm border border-zinc-600"
+                style={{ backgroundColor: state.backgroundColor }}
+              />
+              <span className="font-mono text-[10px] uppercase text-zinc-400">
+                {state.backgroundColor}
+              </span>
+            </button>
+          </ColorPicker>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-zinc-500"
+            title="Vymeniť FG/BG (X)"
+            onClick={() => dispatch({ type: 'SWAP_COLORS' })}
+          >
+            ⇄
+          </Button>
         </div>
 
         <span className="chrome-vdivider" aria-hidden />

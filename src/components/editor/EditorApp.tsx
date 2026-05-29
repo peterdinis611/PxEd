@@ -133,7 +133,7 @@ function EditorShell() {
 export function EditorApp() {
   return (
     <EditorProvider>
-      <TooltipProvider delayDuration={400}>
+      <TooltipProvider delayDuration={300}>
         <EditorShell />
       </TooltipProvider>
     </EditorProvider>
