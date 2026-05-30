@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { Copy, Eye, EyeOff, Lock, Unlock } from 'lucide-react'
+import { Eye, EyeOff, Lock, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToolTooltip } from '@/components/editor/ToolTooltip'

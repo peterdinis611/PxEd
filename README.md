@@ -4,10 +4,12 @@ A Photoshop-style image editor built with React, TypeScript, Tailwind CSS, and s
 
 ## Run locally
 
+Uses [Bun](https://bun.sh) as the package manager:
+
 ```bash
 cd image-editor
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Open the URL shown in the terminal (usually http://localhost:5173).
@@ -20,7 +22,9 @@ Open the URL shown in the terminal (usually http://localhost:5173).
 - Filters: blur, sharpen, noise, pixelate, emboss
 - History: 50 states with undo/redo and click-to-jump
 - Export: PNG, JPEG, JSON project file
-- Keyboard shortcuts (V, M, B, E, Ctrl+Z, etc.)
+- Keyboard shortcuts via **TanStack Hotkeys** (`Mod+Z`, `V`, `B`, etc.)
+- Autosaved drafts in IndexedDB
+- Virtualized layer list and history panel (**TanStack Virtual**)
 
 ## Stack
 
@@ -28,3 +32,14 @@ Open the URL shown in the terminal (usually http://localhost:5173).
 - Vite 8
 - Tailwind CSS 4
 - Radix UI primitives (shadcn-style components)
+- [@tanstack/react-hotkeys](https://tanstack.com/hotkeys)
+- [@tanstack/react-virtual](https://tanstack.com/virtual)
+
+## Scripts
+
+| Command        | Description              |
+|----------------|--------------------------|
+| `bun run dev`  | Start dev server         |
+| `bun run build`| Production build         |
+| `bun run lint` | ESLint                   |
+| `bun run preview` | Preview production build |

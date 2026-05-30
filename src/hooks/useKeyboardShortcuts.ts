@@ -23,13 +23,19 @@ export function useKeyboardShortcuts(
         onCopy,
         onPaste,
         onClear,
-        dispatch,
+        undo: () => dispatch({ type: 'UNDO' }),
+        redo: () => dispatch({ type: 'REDO' }),
+        duplicateLayer: () => {
+          if (state.activeLayerId) {
+            dispatch({ type: 'DUPLICATE_LAYER', id: state.activeLayerId })
+          }
+        },
+        canDuplicateLayer: !!state.activeLayerId,
         addLayer: () => {
           addLayer()
         },
         rotateActiveLayer,
-        activeLayerId: state.activeLayerId,
-        activeLayerLocked: activeLayer?.locked ?? false,
+        canRotateLayer: !!activeLayer && !activeLayer.locked,
         brushSize: state.brush.size,
         setTool: (tool: ToolName) => dispatch({ type: 'SET_TOOL', tool }),
         setBrushSize: (size) =>

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
@@ -23,9 +23,12 @@ const TABS: { id: PanelTab; label: string }[] = [
   { id: 'history', label: 'History' },
 ]
 
+const HISTORY_ROW_HEIGHT = 30
+
 export function PropertiesPanel() {
   const [tab, setTab] = useState<PanelTab>('edit')
   const { activeLayer, commitHistory, updateActiveLayerCanvas } = useEditor()
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const applyAdj = (fn: (ctx: CanvasRenderingContext2D) => void, label: string) => {
     if (!activeLayer) return
@@ -59,10 +62,13 @@ export function PropertiesPanel() {
         ))}
       </div>
 
-      <div className="smooth-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2">
+      <div
+        ref={scrollRef}
+        className="smooth-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2"
+      >
         {tab === 'edit' && <EditPanel onApply={applyAdj} hasLayer={!!activeLayer} />}
         {tab === 'view' && <ViewPanel />}
-        {tab === 'history' && <HistoryPanel />}
+        {tab === 'history' && <HistoryPanel scrollRef={scrollRef} />}
       </div>
     </section>
   )
@@ -104,8 +110,19 @@ function ViewPanel() {
   )
 }
 
-function HistoryPanel() {
+function HistoryPanel({
+  scrollRef,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>
+}) {
   const { state, dispatch } = useEditor()
+
+  const virtualizer = useVirtualizer({
+    count: state.history.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => HISTORY_ROW_HEIGHT,
+    overscan: 8,
+  })
 
   if (state.history.length === 0) {
     return (
@@ -114,28 +131,38 @@ function HistoryPanel() {
   }
 
   return (
-    <ul className="space-y-1">
-      {state.history.map((h, i) => (
-        <li key={`${i}-${h.description}`}>
-          <motion.button
-            type="button"
-            layout
-            initial={false}
-            whileHover={{ x: 2 }}
-            whileTap={{ scale: 0.98 }}
-            className={cn(
-              'interactive w-full rounded px-2 py-1.5 text-left text-ui-xs',
-              i === state.historyIndex
-                ? 'bg-blue-500/15 font-medium text-blue-300 ring-1 ring-blue-500/30'
-                : 'text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200',
-            )}
-            onClick={() => dispatch({ type: 'JUMP_HISTORY', index: i })}
+    <div
+      className="relative w-full"
+      style={{ height: `${virtualizer.getTotalSize()}px` }}
+    >
+      {virtualizer.getVirtualItems().map((virtualRow) => {
+        const i = virtualRow.index
+        const h = state.history[i]!
+        return (
+          <div
+            key={`${i}-${h.description}`}
+            className="absolute left-0 top-0 w-full"
+            style={{
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
           >
-            {h.description}
-          </motion.button>
-        </li>
-      ))}
-    </ul>
+            <button
+              type="button"
+              className={cn(
+                'interactive h-full w-full rounded px-2 py-1.5 text-left text-ui-xs',
+                i === state.historyIndex
+                  ? 'bg-blue-500/15 font-medium text-blue-300 ring-1 ring-blue-500/30'
+                  : 'text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200',
+              )}
+              onClick={() => dispatch({ type: 'JUMP_HISTORY', index: i })}
+            >
+              {h.description}
+            </button>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

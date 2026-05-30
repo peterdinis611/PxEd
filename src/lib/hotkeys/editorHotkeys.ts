@@ -1,4 +1,4 @@
-import type { UseHotkeyDefinition } from '@tanstack/react-hotkeys'
+import type { RegisterableHotkey, UseHotkeyDefinition } from '@tanstack/react-hotkeys'
 import type { ToolName } from '@/types/editor'
 
 const TOOL_KEYS: Record<string, ToolName> = {
@@ -27,14 +27,13 @@ export interface EditorHotkeyDeps {
   onCopy: () => void
   onPaste: () => void
   onClear: () => void
-  dispatch: React.Dispatch<{
-    type: string
-    [key: string]: unknown
-  }>
+  undo: () => void
+  redo: () => void
+  duplicateLayer: () => void
+  canDuplicateLayer: boolean
   addLayer: () => void
   rotateActiveLayer: (delta: number) => void
-  activeLayerId: string | null
-  activeLayerLocked: boolean
+  canRotateLayer: boolean
   brushSize: number
   setTool: (tool: ToolName) => void
   setBrushSize: (size: number) => void
@@ -43,6 +42,10 @@ export interface EditorHotkeyDeps {
 }
 
 const prevent = { preventDefault: true } as const
+
+function hk(key: string): RegisterableHotkey {
+  return key as RegisterableHotkey
+}
 
 export function buildEditorHotkeyDefinitions(
   deps: EditorHotkeyDeps,
@@ -54,11 +57,13 @@ export function buildEditorHotkeyDefinitions(
     onCopy,
     onPaste,
     onClear,
-    dispatch,
+    undo,
+    redo,
+    duplicateLayer,
+    canDuplicateLayer,
     addLayer,
     rotateActiveLayer,
-    activeLayerId,
-    activeLayerLocked,
+    canRotateLayer,
     brushSize,
     setTool,
     setBrushSize,
@@ -77,35 +82,25 @@ export function buildEditorHotkeyDefinitions(
       callback: () => setSpacePan(false),
       options: { eventType: 'keyup' },
     },
+    { hotkey: hk('Mod+Shift+N'), callback: () => addLayer(), options: prevent },
     {
-      hotkey: 'Mod+Shift+N',
-      callback: () => addLayer(),
-      options: prevent,
+      hotkey: hk('Mod+Shift+]'),
+      callback: () => rotateActiveLayer(90),
+      options: { ...prevent, enabled: canRotateLayer },
     },
     {
-      hotkey: 'Mod+Shift+]',
-      callback: () => {
-        if (!activeLayerLocked) rotateActiveLayer(90)
-      },
-      options: { ...prevent, enabled: !activeLayerLocked },
-    },
-    {
-      hotkey: 'Mod+Shift+[',
-      callback: () => {
-        if (!activeLayerLocked) rotateActiveLayer(-90)
-      },
-      options: { ...prevent, enabled: !activeLayerLocked },
+      hotkey: hk('Mod+Shift+['),
+      callback: () => rotateActiveLayer(-90),
+      options: { ...prevent, enabled: canRotateLayer },
     },
     {
       hotkey: 'Mod+J',
-      callback: () => {
-        if (activeLayerId) dispatch({ type: 'DUPLICATE_LAYER', id: activeLayerId })
-      },
-      options: { ...prevent, enabled: !!activeLayerId },
+      callback: () => duplicateLayer(),
+      options: { ...prevent, enabled: canDuplicateLayer },
     },
-    { hotkey: 'Mod+Z', callback: () => dispatch({ type: 'UNDO' }), options: prevent },
-    { hotkey: 'Mod+Y', callback: () => dispatch({ type: 'REDO' }), options: prevent },
-    { hotkey: 'Mod+Shift+Z', callback: () => dispatch({ type: 'REDO' }), options: prevent },
+    { hotkey: 'Mod+Z', callback: undo, options: prevent },
+    { hotkey: 'Mod+Y', callback: redo, options: prevent },
+    { hotkey: 'Mod+Shift+Z', callback: redo, options: prevent },
     { hotkey: 'Mod+D', callback: onDeselect, options: prevent },
     { hotkey: 'Mod+A', callback: onSelectAll, options: prevent },
     { hotkey: 'Mod+C', callback: onCopy, options: prevent },
@@ -123,11 +118,11 @@ export function buildEditorHotkeyDefinitions(
     { hotkey: 'X', callback: swapColors },
     { hotkey: 'D', callback: resetColors },
     {
-      hotkey: '[',
+      hotkey: hk('['),
       callback: () => setBrushSize(Math.max(1, brushSize - 2)),
     },
     {
-      hotkey: ']',
+      hotkey: hk(']'),
       callback: () => setBrushSize(Math.min(500, brushSize + 2)),
     },
     { hotkey: 'Shift+G', callback: () => setTool('gradient') },
@@ -138,7 +133,7 @@ export function buildEditorHotkeyDefinitions(
 
   for (const [key, tool] of Object.entries(TOOL_KEYS)) {
     hotkeys.push({
-      hotkey: key,
+      hotkey: hk(key),
       callback: () => setTool(tool),
     })
   }
