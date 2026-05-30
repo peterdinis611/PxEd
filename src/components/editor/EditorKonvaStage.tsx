@@ -16,6 +16,7 @@ export function EditorKonvaStage({
   panX,
   panY,
   renderTick,
+  documentFill,
   onLayout,
   stageRef,
 }: {
@@ -28,6 +29,7 @@ export function EditorKonvaStage({
   panX: number
   panY: number
   renderTick: number
+  documentFill: string
   onLayout: (layout: ReturnType<typeof getViewportLayout>) => void
   stageRef: React.RefObject<Konva.Stage | null>
 }) {
@@ -88,20 +90,27 @@ export function EditorKonvaStage({
         scaleY={scale}
         listening={false}
       >
-        <Rect width={docWidth} height={docHeight} fill="#ffffff" listening={false} />
-        {layers.map((layer) =>
-          layer.visible ? (
+        <Rect width={docWidth} height={docHeight} fill={documentFill} listening={false} />
+        {layers.map((layer) => {
+          if (!layer.visible) return null
+          const w = layer.canvas.width
+          const h = layer.canvas.height
+          const rot = layer.rotation ?? 0
+          return (
             <KonvaImage
               key={layer.id}
               image={layer.canvas}
-              x={layer.x}
-              y={layer.y}
+              x={layer.x + w / 2}
+              y={layer.y + h / 2}
+              offsetX={w / 2}
+              offsetY={h / 2}
+              rotation={rot}
               opacity={layer.opacity / 100}
               globalCompositeOperation={BLEND_MODE_MAP[layer.blendMode]}
               listening={false}
             />
-          ) : null,
-        )}
+          )
+        })}
       </Layer>
     </Stage>
   )

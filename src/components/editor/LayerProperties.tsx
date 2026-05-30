@@ -1,5 +1,7 @@
+import { RotateCcw, RotateCw } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -9,6 +11,7 @@ import {
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { useEditor } from '@/context/EditorContext'
+import { isDocumentBackdropLayer } from '@/lib/canvas/layerBounds'
 import { snapCoord } from '@/lib/canvas/snap'
 import type { BlendMode } from '@/types/editor'
 
@@ -28,12 +31,26 @@ const BLEND_MODES: BlendMode[] = [
 ]
 
 export function LayerProperties() {
-  const { state, dispatch } = useEditor()
+  const {
+    state,
+    dispatch,
+    commitHistory,
+    rotateActiveLayer,
+    setActiveLayerRotation,
+    bakeActiveLayerRotation,
+  } = useEditor()
   const active = state.layers.find((l) => l.id === state.activeLayerId)
 
   const snap = (n: number) => snapCoord(n, state.gridSize, state.snapToGrid)
-
   if (!active) return null
+
+  const rotation = active.rotation ?? 0
+  const isBackdrop = isDocumentBackdropLayer(
+    active,
+    state.canvasWidth,
+    state.canvasHeight,
+  )
+  const canRotate = !active.locked && !isBackdrop
 
   return (
     <section className="sidebar-section shrink-0 px-2 py-2">
@@ -92,6 +109,69 @@ export function LayerProperties() {
         <span className="w-8 text-right text-ui-xs tabular-nums text-zinc-400">
           {active.opacity}
         </span>
+      </div>
+
+      <div className="mt-2 space-y-1.5">
+        {isBackdrop ? (
+          <p className="text-[10px] leading-snug text-amber-400/90">
+            Background sheet cannot rotate. Select an object layer or add a new layer.
+          </p>
+        ) : (
+          <p className="text-[10px] leading-snug text-zinc-500">
+            Rotates this object only. The paper (canvas) stays fixed.
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-ui-xs text-zinc-600">Angle</Label>
+          <span className="text-ui-xs tabular-nums text-zinc-400">{Math.round(rotation)}°</span>
+        </div>
+        <Slider
+          value={[rotation]}
+          min={0}
+          max={360}
+          step={1}
+          disabled={!canRotate}
+          onValueChange={([v]) => setActiveLayerRotation(v!)}
+          onValueCommit={() => commitHistory('Rotation')}
+        />
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 px-0 text-ui-xs"
+            disabled={!canRotate}
+            onClick={() => rotateActiveLayer(-90)}
+            title="Rotate 90° counter-clockwise"
+          >
+            <RotateCcw className="mr-1 h-3 w-3" />
+            −90°
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 px-0 text-ui-xs"
+            disabled={!canRotate}
+            onClick={() => rotateActiveLayer(90)}
+            title="Rotate 90° clockwise"
+          >
+            <RotateCw className="mr-1 h-3 w-3" />
+            +90°
+          </Button>
+        </div>
+        {rotation !== 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 w-full text-ui-xs text-zinc-400"
+            disabled={!canRotate}
+            onClick={bakeActiveLayerRotation}
+          >
+            Bake rotation into pixels
+          </Button>
+        )}
       </div>
 
       <div className="mt-2 flex items-center gap-2">

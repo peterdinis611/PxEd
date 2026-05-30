@@ -1,4 +1,5 @@
 import { BLEND_MODE_MAP } from '@/types/editor'
+import { drawLayerWithTransform } from '@/lib/canvas/transform'
 import type { Layer } from '@/types/editor'
 import {
   getViewportLayout,
@@ -68,7 +69,7 @@ export function renderComposite(
     ctx.save()
     ctx.globalAlpha = layer.opacity / 100
     ctx.globalCompositeOperation = BLEND_MODE_MAP[layer.blendMode]
-    ctx.drawImage(layer.canvas, layer.x, layer.y)
+    drawLayerWithTransform(ctx, layer)
     ctx.restore()
   }
 

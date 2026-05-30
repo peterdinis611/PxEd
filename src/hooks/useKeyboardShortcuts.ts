@@ -29,7 +29,7 @@ export function useKeyboardShortcuts(
   onPaste: () => void,
   onClear: () => void,
 ) {
-  const { state, dispatch, addLayer } = useEditor()
+  const { state, dispatch, addLayer, rotateActiveLayer, activeLayer } = useEditor()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -52,6 +52,16 @@ export function useKeyboardShortcuts(
       if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         addLayer()
+        return
+      }
+      if (mod && e.shiftKey && e.key === ']') {
+        e.preventDefault()
+        if (!activeLayer?.locked) rotateActiveLayer(90)
+        return
+      }
+      if (mod && e.shiftKey && e.key === '[') {
+        e.preventDefault()
+        if (!activeLayer?.locked) rotateActiveLayer(-90)
         return
       }
       if (mod && e.key.toLowerCase() === 'j') {
@@ -162,6 +172,8 @@ export function useKeyboardShortcuts(
   }, [
     dispatch,
     addLayer,
+    rotateActiveLayer,
+    activeLayer,
     state.activeLayerId,
     state.brush.size,
     setSpacePan,

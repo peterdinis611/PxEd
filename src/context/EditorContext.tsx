@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import { createLayer, cloneLayer, snapshotLayer, restoreLayerFromSnapshot, renderTextLayer } from '@/lib/canvas/layers'
+import { canRotateLayer } from '@/lib/canvas/layerBounds'
+import { bakeLayerRotation, normalizeAngle, rotateLayerBy } from '@/lib/canvas/transform'
 import type {
   BlendMode,
   BrushSettings,
@@ -46,6 +48,8 @@ export interface EditorState {
   historyIndex: number
   canvasWidth: number
   canvasHeight: number
+  /** Fixed document backdrop (Konva rect), not a rotatable layer. */
+  canvasBackground: string
   showGrid: boolean
   showRulers: boolean
   clipboard: ImageData | null
@@ -248,14 +252,9 @@ function reducer(state: EditorState, action: Action): EditorState {
       return { ...state, layers, renderTick: state.renderTick + 1 }
     }
     case 'NEW_DOCUMENT': {
-      const bgLayer = createLayer(
-        action.width,
-        action.height,
-        'Background',
-        { fill: action.bg },
-      )
+      const layer = createLayer(action.width, action.height, 'Layer 1')
       const entry: HistoryEntry = {
-        layers: [snapshotLayer(bgLayer)],
+        layers: [snapshotLayer(layer)],
         canvasWidth: action.width,
         canvasHeight: action.height,
         description: 'New Document',
@@ -263,10 +262,11 @@ function reducer(state: EditorState, action: Action): EditorState {
       }
       return {
         ...state,
-        layers: [bgLayer],
-        activeLayerId: bgLayer.id,
+        layers: [layer],
+        activeLayerId: layer.id,
         canvasWidth: action.width,
         canvasHeight: action.height,
+        canvasBackground: action.bg,
         selection: null,
         history: [entry],
         historyIndex: 0,
@@ -336,6 +336,7 @@ function reducer(state: EditorState, action: Action): EditorState {
       return {
         ...state,
         ...action.state,
+        canvasBackground: state.canvasBackground ?? '#ffffff',
         history: [
           {
             layers: action.state.layers.map(snapshotLayer),
@@ -354,17 +355,17 @@ function reducer(state: EditorState, action: Action): EditorState {
 }
 
 function createInitialState(): EditorState {
-  const bgLayer = createLayer(800, 600, 'Background', { fill: '#ffffff' })
+  const layer = createLayer(800, 600, 'Layer 1')
   const entry: HistoryEntry = {
-    layers: [snapshotLayer(bgLayer)],
+    layers: [snapshotLayer(layer)],
     canvasWidth: 800,
     canvasHeight: 600,
     description: 'New Document',
     selection: null,
   }
   return {
-    layers: [bgLayer],
-    activeLayerId: bgLayer.id,
+    layers: [layer],
+    activeLayerId: layer.id,
     tool: 'brush',
     foregroundColor: '#000000',
     backgroundColor: '#ffffff',
@@ -387,6 +388,7 @@ function createInitialState(): EditorState {
     historyIndex: 0,
     canvasWidth: 800,
     canvasHeight: 600,
+    canvasBackground: '#ffffff',
     showGrid: false,
     showRulers: true,
     clipboard: null,
@@ -420,6 +422,9 @@ interface EditorContextValue {
   commitHistory: (description: string) => void
   updateActiveLayerCanvas: (fn: (ctx: CanvasRenderingContext2D) => void) => void
   addLayer: (options?: AddLayerOptions) => Layer
+  rotateActiveLayer: (deltaDegrees: number) => void
+  setActiveLayerRotation: (degrees: number) => void
+  bakeActiveLayerRotation: () => void
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -449,6 +454,74 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     [state.layers, state.activeLayerId],
   )
 
+  const rotateActiveLayer = useCallback(
+    (deltaDegrees: number) => {
+      const layer = state.layers.find((l) => l.id === state.activeLayerId)
+      if (
+        !layer ||
+        !canRotateLayer(layer, state.canvasWidth, state.canvasHeight)
+      ) {
+        return
+      }
+      const next = rotateLayerBy(layer, deltaDegrees)
+      dispatch({
+        type: 'UPDATE_LAYER',
+        id: layer.id,
+        patch: { rotation: next.rotation },
+      })
+      commitHistory(deltaDegrees > 0 ? 'Rotate Layer CW' : 'Rotate Layer CCW')
+    },
+    [state.layers, state.activeLayerId, state.canvasWidth, state.canvasHeight, dispatch, commitHistory],
+  )
+
+  const setActiveLayerRotation = useCallback(
+    (degrees: number) => {
+      const layer = state.layers.find((l) => l.id === state.activeLayerId)
+      if (
+        !layer ||
+        !canRotateLayer(layer, state.canvasWidth, state.canvasHeight)
+      ) {
+        return
+      }
+      dispatch({
+        type: 'UPDATE_LAYER',
+        id: layer.id,
+        patch: { rotation: normalizeAngle(degrees) },
+      })
+    },
+    [state.layers, state.activeLayerId, state.canvasWidth, state.canvasHeight, dispatch],
+  )
+
+  const bakeActiveLayerRotation = useCallback(() => {
+    const layer = state.layers.find((l) => l.id === state.activeLayerId)
+    if (
+      !layer ||
+      !canRotateLayer(layer, state.canvasWidth, state.canvasHeight) ||
+      !(layer.rotation ?? 0)
+    ) {
+      return
+    }
+    const baked = bakeLayerRotation(layer)
+    dispatch({
+      type: 'UPDATE_LAYER',
+      id: layer.id,
+      patch: {
+        canvas: baked.canvas,
+        x: baked.x,
+        y: baked.y,
+        rotation: 0,
+      },
+    })
+    commitHistory('Bake Rotation')
+  }, [
+    state.layers,
+    state.activeLayerId,
+    state.canvasWidth,
+    state.canvasHeight,
+    dispatch,
+    commitHistory,
+  ])
+
   const addLayer = useCallback(
     (options?: AddLayerOptions): Layer => {
       const layer =
@@ -477,8 +550,20 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       commitHistory,
       updateActiveLayerCanvas,
       addLayer,
+      rotateActiveLayer,
+      setActiveLayerRotation,
+      bakeActiveLayerRotation,
     }),
-    [state, activeLayer, commitHistory, updateActiveLayerCanvas, addLayer],
+    [
+      state,
+      activeLayer,
+      commitHistory,
+      updateActiveLayerCanvas,
+      addLayer,
+      rotateActiveLayer,
+      setActiveLayerRotation,
+      bakeActiveLayerRotation,
+    ],
   )
 
   return (

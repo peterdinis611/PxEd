@@ -7,9 +7,7 @@ import { LoadingPage } from '@/components/pages/LoadingPage'
 import { NotFoundPage } from '@/components/pages/NotFoundPage'
 import { ErrorPage } from '@/components/pages/ErrorPage'
 
-const EditorApp = lazy(() =>
-  import('@/components/editor/EditorApp').then((m) => ({ default: m.EditorApp })),
-)
+const EditorApp = lazy(() => import('@/components/editor/EditorApp'))
 
 function EditorRoute() {
   return (

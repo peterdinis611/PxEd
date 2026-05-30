@@ -4,6 +4,7 @@ import {
   restoreLayerFromSnapshot,
   createLayer,
 } from '@/lib/canvas/layers'
+import { drawLayerWithTransform } from '@/lib/canvas/transform'
 
 export function exportFlattenedPng(
   layers: Layer[],
@@ -22,7 +23,7 @@ export function exportFlattenedPng(
     ctx.save()
     ctx.globalAlpha = layer.opacity / 100
     ctx.globalCompositeOperation = layer.blendMode as GlobalCompositeOperation
-    ctx.drawImage(layer.canvas, layer.x, layer.y)
+    drawLayerWithTransform(ctx, layer)
     ctx.restore()
   }
 
@@ -45,7 +46,7 @@ export function exportJpeg(
     if (!layer.visible) continue
     ctx.save()
     ctx.globalAlpha = layer.opacity / 100
-    ctx.drawImage(layer.canvas, layer.x, layer.y)
+    drawLayerWithTransform(ctx, layer)
     ctx.restore()
   }
   const link = document.createElement('a')

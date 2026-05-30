@@ -111,7 +111,8 @@ const TOOL_LABELS: Record<ToolName, string> = {
 }
 
 export function OptionsBar() {
-  const { state, dispatch, activeLayer } = useEditor()
+  const { state, dispatch, activeLayer, rotateActiveLayer, setActiveLayerRotation, commitHistory } =
+    useEditor()
   const { tool, brush, shape, zoom, marquee } = state
 
   const setBrush = (patch: Partial<typeof brush>) =>
@@ -248,6 +249,31 @@ export function OptionsBar() {
                   Y
                   <Input type="number" className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums" value={Math.round(activeLayer.y)} onChange={(e) => dispatch({ type: 'UPDATE_LAYER', id: activeLayer.id, patch: { y: snapCoord(+e.target.value, state.gridSize, state.snapToGrid) } })} />
                 </label>
+                <label className="flex items-center gap-1 text-ui-xs text-zinc-500">
+                  °
+                  <Input
+                    type="number"
+                    className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums"
+                    value={Math.round(activeLayer.rotation ?? 0)}
+                    min={0}
+                    max={360}
+                    disabled={activeLayer.locked}
+                    onChange={(e) => setActiveLayerRotation(+e.target.value)}
+                    onBlur={() => commitHistory('Rotation')}
+                  />
+                </label>
+                <ToggleBtn
+                  active={false}
+                  onClick={() => !activeLayer.locked && rotateActiveLayer(-90)}
+                >
+                  −90°
+                </ToggleBtn>
+                <ToggleBtn
+                  active={false}
+                  onClick={() => !activeLayer.locked && rotateActiveLayer(90)}
+                >
+                  +90°
+                </ToggleBtn>
                 <ToggleBtn active={state.snapToGrid} onClick={() => dispatch({ type: 'SET_VIEW_OPTS', patch: { snapToGrid: !state.snapToGrid } })}>Snap</ToggleBtn>
               </OptionsStrip>
             )}

@@ -36,6 +36,7 @@ import {
   emboss,
 } from '@/lib/canvas/filters'
 import { grayscale, invertColors } from '@/lib/canvas/adjustments'
+import { drawLayerWithTransform } from '@/lib/canvas/transform'
 import type { ToolName } from '@/types/editor'
 
 const SHORTCUT_GROUPS: { title: string; rows: [string, string][] }[] = [
@@ -54,12 +55,16 @@ const SHORTCUT_GROUPS: { title: string; rows: [string, string][] }[] = [
       ['Copy / Paste', 'Ctrl+C / Ctrl+V'],
       ['Select all / Deselect', 'Ctrl+A / Ctrl+D'],
       ['Clear selection', 'Delete'],
+      ['Rotate layer 90°', 'Ctrl+Shift+[ / Ctrl+Shift+]'],
       ['Swap / Default colors', 'X / D'],
     ],
   },
   {
     title: 'Layer',
-    rows: [['Duplicate layer', 'Ctrl+J']],
+    rows: [
+      ['Duplicate layer', 'Ctrl+J'],
+      ['Rotate object (active layer)', 'Layer panel or Edit menu'],
+    ],
   },
   {
     title: 'Tools',
@@ -106,8 +111,15 @@ export function MenuBar({
   onPaste,
   onClear,
 }: MenuBarProps) {
-  const { state, dispatch, commitHistory, updateActiveLayerCanvas, addLayer } =
-    useEditor()
+  const {
+    state,
+    dispatch,
+    commitHistory,
+    updateActiveLayerCanvas,
+    addLayer,
+    rotateActiveLayer,
+    bakeActiveLayerRotation,
+  } = useEditor()
   const fileRef = useRef<HTMLInputElement>(null)
   const openRef = useRef<HTMLInputElement>(null)
 
@@ -168,7 +180,7 @@ export function MenuBar({
       if (!layer.visible) continue
       ctx.save()
       ctx.globalAlpha = layer.opacity / 100
-      ctx.drawImage(layer.canvas, layer.x, layer.y)
+      drawLayerWithTransform(ctx, layer)
       ctx.restore()
     }
     const flat = createLayer(state.canvasWidth, state.canvasHeight, 'Flattened')
@@ -176,24 +188,6 @@ export function MenuBar({
     dispatch({ type: 'SET_LAYERS', layers: [flat] })
     dispatch({ type: 'SET_ACTIVE_LAYER', id: flat.id })
     commitHistory('Flatten Image')
-  }
-
-  const rotateCanvas = (dir: 'cw' | 'ccw') => {
-    const w = state.canvasHeight
-    const h = state.canvasWidth
-    const layers = state.layers.map((l) => {
-      const nc = document.createElement('canvas')
-      nc.width = w
-      nc.height = h
-      const ctx = nc.getContext('2d')!
-      ctx.translate(w / 2, h / 2)
-      ctx.rotate(dir === 'cw' ? Math.PI / 2 : -Math.PI / 2)
-      ctx.drawImage(l.canvas, -l.canvas.width / 2, -l.canvas.height / 2)
-      return { ...l, canvas: nc }
-    })
-    dispatch({ type: 'SET_CANVAS_SIZE', width: w, height: h })
-    dispatch({ type: 'SET_LAYERS', layers })
-    commitHistory(`Rotate ${dir === 'cw' ? 'CW' : 'CCW'}`)
   }
 
   const flip = (axis: 'h' | 'v') => {
@@ -226,7 +220,10 @@ export function MenuBar({
     const below = state.layers[idx - 1]!
     const above = state.layers[idx]!
     const ctx = below.canvas.getContext('2d')!
-    ctx.drawImage(above.canvas, above.x, above.y)
+    ctx.save()
+    ctx.globalAlpha = above.opacity / 100
+    drawLayerWithTransform(ctx, above)
+    ctx.restore()
     const layers = state.layers.filter((l) => l.id !== above.id)
     dispatch({ type: 'SET_LAYERS', layers })
     dispatch({ type: 'SET_ACTIVE_LAYER', id: below.id })
@@ -299,6 +296,21 @@ export function MenuBar({
             action: onClear,
             shortcut: 'Del',
             disabled: !hasSelection,
+          },
+          { type: 'separator' },
+          {
+            type: 'item',
+            label: 'Rotate Layer 90° CW',
+            action: () => rotateActiveLayer(90),
+            shortcut: 'Ctrl+Shift+]',
+            disabled: !activeLayer || activeLayer.locked,
+          },
+          {
+            type: 'item',
+            label: 'Rotate Layer 90° CCW',
+            action: () => rotateActiveLayer(-90),
+            shortcut: 'Ctrl+Shift+[',
+            disabled: !activeLayer || activeLayer.locked,
           },
           { type: 'separator' },
           { type: 'item', label: 'Swap Colors', action: () => dispatch({ type: 'SWAP_COLORS' }), shortcut: 'X' },
@@ -375,6 +387,28 @@ export function MenuBar({
             action: () => toggleActiveLayer({ locked: !activeLayer?.locked }),
             disabled: !activeLayer,
           },
+          { type: 'separator' },
+          {
+            type: 'item',
+            label: 'Rotate Object 90° CW',
+            action: () => rotateActiveLayer(90),
+            disabled: !activeLayer || activeLayer.locked,
+          },
+          {
+            type: 'item',
+            label: 'Rotate Object 90° CCW',
+            action: () => rotateActiveLayer(-90),
+            disabled: !activeLayer || activeLayer.locked,
+          },
+          {
+            type: 'item',
+            label: 'Bake Rotation to Pixels',
+            action: bakeActiveLayerRotation,
+            disabled:
+              !activeLayer ||
+              activeLayer.locked ||
+              !(activeLayer.rotation ?? 0),
+          },
         ],
       },
       {
@@ -389,9 +423,6 @@ export function MenuBar({
               setCanvasSizeOpen(true)
             },
           },
-          { type: 'separator' },
-          { type: 'item', label: 'Rotate 90° Clockwise', action: () => rotateCanvas('cw') },
-          { type: 'item', label: 'Rotate 90° Counter-Clockwise', action: () => rotateCanvas('ccw') },
           { type: 'item', label: 'Flip Horizontal', action: () => flip('h') },
           { type: 'item', label: 'Flip Vertical', action: () => flip('v') },
           { type: 'separator' },

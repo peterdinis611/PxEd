@@ -15,8 +15,15 @@ import { normalizeRect } from '@/lib/canvas/selection'
 import { snapPoint } from '@/lib/canvas/snap'
 import { createLayer, renderTextLayer } from '@/lib/canvas/layers'
 import { drawArrow } from '@/lib/canvas/shapes'
+import { LayerSelectionOverlay } from '@/components/editor/LayerSelectionOverlay'
 import { ShapeDrawPreviewOverlay } from '@/components/editor/ShapeDrawPreview'
 import { useEditor } from '@/context/EditorContext'
+import {
+  findLayerAtPoint,
+  getLayerCenter,
+  isDocumentBackdropLayer,
+  isNearRotateHandle,
+} from '@/lib/canvas/layerBounds'
 import type { Selection } from '@/types/editor'
 import type { ShapeDrawPreview } from '@/types/shapePreview'
 
@@ -50,8 +57,14 @@ export function CanvasArea({
   spacePan: boolean
   onCursorMove: (x: number, y: number, rgba: string) => void
 }) {
-  const { state, dispatch, activeLayer, commitHistory, updateActiveLayerCanvas } =
-    useEditor()
+  const {
+    state,
+    dispatch,
+    activeLayer,
+    commitHistory,
+    updateActiveLayerCanvas,
+    setActiveLayerRotation,
+  } = useEditor()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const [layout, setLayout] = useState<ViewportLayout>({
@@ -73,6 +86,7 @@ export function CanvasArea({
     lastY: number
     points?: { x: number; y: number }[]
     panStart?: { panX: number; panY: number }
+    layerId?: string
     layerOffset?: { x: number; y: number }
   } | null>(null)
 
@@ -85,6 +99,12 @@ export function CanvasArea({
   const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const polygonRef = useRef<{ points: { x: number; y: number }[] } | null>(null)
+  const rotateDragRef = useRef<{
+    centerX: number
+    centerY: number
+    startAngle: number
+    startRotation: number
+  } | null>(null)
 
   const showZoomHint = useCallback((zoom: number) => {
     setZoomHint(zoom)
@@ -292,6 +312,50 @@ export function CanvasArea({
       return
     }
 
+    if (tool === 'move') {
+      const hit = findLayerAtPoint(
+        state.layers,
+        x,
+        y,
+        state.canvasWidth,
+        state.canvasHeight,
+      )
+      const moveLayer = hit ?? (layer && !layer.locked ? layer : null)
+      if (hit) {
+        dispatch({ type: 'SET_ACTIVE_LAYER', id: hit.id })
+      }
+      if (!moveLayer || moveLayer.locked) return
+
+      if (
+        !isDocumentBackdropLayer(
+          moveLayer,
+          state.canvasWidth,
+          state.canvasHeight,
+        ) &&
+        isNearRotateHandle(moveLayer, x, y, 12 / layoutRef.current.scale)
+      ) {
+        const c = getLayerCenter(moveLayer)
+        rotateDragRef.current = {
+          centerX: c.x,
+          centerY: c.y,
+          startAngle: Math.atan2(y - c.y, x - c.x),
+          startRotation: moveLayer.rotation ?? 0,
+        }
+        return
+      }
+
+      dragRef.current = {
+        type: 'move',
+        startX: x,
+        startY: y,
+        lastX: x,
+        lastY: y,
+        layerId: moveLayer.id,
+        layerOffset: { x: moveLayer.x, y: moveLayer.y },
+      }
+      return
+    }
+
     if (!layer || layer.locked) return
 
     if (tool === 'magic-wand') {
@@ -363,8 +427,6 @@ export function CanvasArea({
       lastX: x,
       lastY: y,
       points: tool === 'lasso' ? [{ x, y }] : undefined,
-      layerOffset:
-        tool === 'move' ? { x: layer.x, y: layer.y } : undefined,
     }
   }
 
@@ -372,6 +434,14 @@ export function CanvasArea({
     const raw = getDocPoint(e)
     const { x, y } = snapPoint(raw.x, raw.y, state.gridSize, state.snapToGrid)
     onCursorMove(raw.x, raw.y, sampleRgba(raw.x, raw.y))
+
+    if (rotateDragRef.current && activeLayer) {
+      const r = rotateDragRef.current
+      const angle = Math.atan2(y - r.centerY, x - r.centerX)
+      const deltaDeg = ((angle - r.startAngle) * 180) / Math.PI
+      setActiveLayerRotation(r.startRotation + deltaDeg)
+      return
+    }
 
     const drag = dragRef.current
     if (!drag) {
@@ -385,10 +455,10 @@ export function CanvasArea({
 
     const tool = drag.type
 
-    if (tool === 'move' && activeLayer && drag.layerOffset) {
+    if (tool === 'move' && drag.layerId && drag.layerOffset) {
       dispatch({
         type: 'UPDATE_LAYER',
-        id: activeLayer.id,
+        id: drag.layerId,
         patch: {
           x: drag.layerOffset.x + (x - drag.startX),
           y: drag.layerOffset.y + (y - drag.startY),
@@ -452,9 +522,20 @@ export function CanvasArea({
   }
 
   const onMouseUp = (e?: React.MouseEvent) => {
+    if (rotateDragRef.current) {
+      if (activeLayer) commitHistory('Rotate Layer')
+      rotateDragRef.current = null
+      return
+    }
+
     const drag = dragRef.current
     if (!drag) return
     dragRef.current = null
+
+    if (drag.type === 'move') {
+      commitHistory('Move Layer')
+      return
+    }
 
     const layer = activeLayer
     let endX = drag.lastX
@@ -792,6 +873,7 @@ export function CanvasArea({
             layers={state.layers}
             docWidth={state.canvasWidth}
             docHeight={state.canvasHeight}
+            documentFill={state.canvasBackground}
             viewportW={viewport.w}
             viewportH={viewport.h}
             zoom={state.zoom}
@@ -801,6 +883,15 @@ export function CanvasArea({
             onLayout={handleLayout}
           />
         </div>
+
+        {state.tool === 'move' && (
+          <LayerSelectionOverlay
+            layer={activeLayer ?? null}
+            docWidth={state.canvasWidth}
+            docHeight={state.canvasHeight}
+            layout={layout}
+          />
+        )}
 
         <ShapeDrawPreviewOverlay
           preview={shapePreview}

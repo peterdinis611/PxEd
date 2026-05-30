@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { EditorProvider, useEditor } from '@/context/EditorContext'
+import { useEditor } from '@/context/EditorContext'
 import { MenuBar } from '@/components/editor/MenuBar'
 import { ToolsPanel } from '@/components/editor/ToolsPanel'
 import { OptionsBar } from '@/components/editor/OptionsBar'
@@ -136,12 +136,13 @@ function EditorShell() {
   )
 }
 
-export function EditorApp() {
+function EditorApp() {
   return (
-    <EditorProvider>
-      <TooltipProvider delayDuration={300}>
-        <EditorShell />
-      </TooltipProvider>
-    </EditorProvider>
+    <TooltipProvider delayDuration={300}>
+      <EditorShell />
+    </TooltipProvider>
   )
 }
+
+export { EditorApp }
+export default EditorApp

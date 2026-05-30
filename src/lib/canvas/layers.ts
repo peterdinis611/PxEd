@@ -37,6 +37,7 @@ export function createLayer(
     canvas: createLayerCanvas(width, height, options?.fill),
     x: 0,
     y: 0,
+    rotation: 0,
     type: options?.type ?? 'pixel',
     textData: options?.textData,
   }
@@ -67,6 +68,7 @@ export function snapshotLayer(layer: Layer): LayerSnapshot {
     imageData: ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height),
     x: layer.x,
     y: layer.y,
+    rotation: layer.rotation ?? 0,
     type: layer.type,
     textData: layer.textData ? { ...layer.textData } : undefined,
   }
@@ -90,6 +92,7 @@ export function restoreLayerFromSnapshot(
     canvas,
     x: snap.x,
     y: snap.y,
+    rotation: snap.rotation ?? 0,
     type: snap.type,
     textData: snap.textData ? { ...snap.textData } : undefined,
   }

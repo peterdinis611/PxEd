@@ -56,6 +56,8 @@ export interface Layer {
   canvas: HTMLCanvasElement
   x: number
   y: number
+  /** Rotation in degrees around the layer center. */
+  rotation: number
   type: 'pixel' | 'text' | 'shape'
   textData?: TextData
 }
@@ -95,6 +97,7 @@ export interface LayerSnapshot {
   imageData: ImageData
   x: number
   y: number
+  rotation: number
   type: 'pixel' | 'text' | 'shape'
   textData?: TextData
 }
