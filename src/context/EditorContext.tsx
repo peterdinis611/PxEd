@@ -78,7 +78,13 @@ type Action =
   | { type: 'SET_LAYERS'; layers: Layer[] }
   | { type: 'SET_ACTIVE_LAYER'; id: string }
   | { type: 'UPDATE_LAYER'; id: string; patch: Partial<Layer> }
-  | { type: 'ADD_LAYER'; layer?: Layer }
+  | {
+      type: 'ADD_LAYER'
+      layer?: Layer
+      name?: string
+      fill?: string
+      insertAboveActive?: boolean
+    }
   | { type: 'DELETE_LAYER'; id: string }
   | { type: 'DUPLICATE_LAYER'; id: string }
   | { type: 'REORDER_LAYERS'; from: number; to: number }
@@ -191,8 +197,23 @@ function reducer(state: EditorState, action: Action): EditorState {
     case 'ADD_LAYER': {
       const layer =
         action.layer ??
-        createLayer(state.canvasWidth, state.canvasHeight, `Layer ${state.layers.length + 1}`)
-      const layers = [...state.layers, layer]
+        createLayer(
+          state.canvasWidth,
+          state.canvasHeight,
+          action.name ?? `Layer ${state.layers.length + 1}`,
+          action.fill !== undefined ? { fill: action.fill } : undefined,
+        )
+      const insertAbove = action.insertAboveActive !== false
+      const activeIdx = state.activeLayerId
+        ? state.layers.findIndex((l) => l.id === state.activeLayerId)
+        : -1
+      let layers: Layer[]
+      if (insertAbove && activeIdx >= 0) {
+        layers = [...state.layers]
+        layers.splice(activeIdx + 1, 0, layer)
+      } else {
+        layers = [...state.layers, layer]
+      }
       return pushHistory(
         { ...state, layers, activeLayerId: layer.id },
         'New Layer',
@@ -382,12 +403,23 @@ function createInitialState(): EditorState {
   }
 }
 
+export interface AddLayerOptions {
+  /** Custom layer instance; skips default empty layer creation. */
+  layer?: Layer
+  name?: string
+  /** Solid fill color, e.g. `#ffffff`. Omit for a transparent layer. */
+  fill?: string
+  /** When true (default), inserts above the active layer in the stack. */
+  insertAboveActive?: boolean
+}
+
 interface EditorContextValue {
   state: EditorState
   dispatch: React.Dispatch<Action>
   activeLayer: Layer | undefined
   commitHistory: (description: string) => void
   updateActiveLayerCanvas: (fn: (ctx: CanvasRenderingContext2D) => void) => void
+  addLayer: (options?: AddLayerOptions) => Layer
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
@@ -417,9 +449,36 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     [state.layers, state.activeLayerId],
   )
 
+  const addLayer = useCallback(
+    (options?: AddLayerOptions): Layer => {
+      const layer =
+        options?.layer ??
+        createLayer(
+          state.canvasWidth,
+          state.canvasHeight,
+          options?.name ?? `Layer ${state.layers.length + 1}`,
+          options?.fill !== undefined ? { fill: options.fill } : undefined,
+        )
+      dispatch({
+        type: 'ADD_LAYER',
+        layer,
+        insertAboveActive: options?.insertAboveActive,
+      })
+      return layer
+    },
+    [state.canvasWidth, state.canvasHeight, state.layers.length, dispatch],
+  )
+
   const value = useMemo(
-    () => ({ state, dispatch, activeLayer, commitHistory, updateActiveLayerCanvas }),
-    [state, activeLayer, commitHistory, updateActiveLayerCanvas],
+    () => ({
+      state,
+      dispatch,
+      activeLayer,
+      commitHistory,
+      updateActiveLayerCanvas,
+      addLayer,
+    }),
+    [state, activeLayer, commitHistory, updateActiveLayerCanvas, addLayer],
   )
 
   return (

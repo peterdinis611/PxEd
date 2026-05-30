@@ -1,5 +1,5 @@
-import { EditorApp } from '@/components/editor/EditorApp'
+import { AppRouter } from '@/routes/AppRouter'
 
 export default function App() {
-  return <EditorApp />
+  return <AppRouter />
 }

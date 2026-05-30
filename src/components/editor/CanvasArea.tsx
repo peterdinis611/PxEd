@@ -14,6 +14,7 @@ import { floodFill, magicWandSelect } from '@/lib/canvas/floodFill'
 import { normalizeRect } from '@/lib/canvas/selection'
 import { snapPoint } from '@/lib/canvas/snap'
 import { createLayer, renderTextLayer } from '@/lib/canvas/layers'
+import { drawArrow } from '@/lib/canvas/shapes'
 import { ShapeDrawPreviewOverlay } from '@/components/editor/ShapeDrawPreview'
 import { useEditor } from '@/context/EditorContext'
 import type { Selection } from '@/types/editor'
@@ -21,6 +22,7 @@ import type { ShapeDrawPreview } from '@/types/shapePreview'
 
 const CURSORS: Record<string, string> = {
   move: 'move',
+  hand: 'grab',
   brush: 'crosshair',
   pencil: 'crosshair',
   eraser: 'crosshair',
@@ -37,6 +39,8 @@ const CURSORS: Record<string, string> = {
   'shape-rect': 'crosshair',
   'shape-ellipse': 'crosshair',
   'shape-line': 'crosshair',
+  'shape-arrow': 'crosshair',
+  'polygon-lasso': 'crosshair',
 }
 
 export function CanvasArea({
@@ -80,6 +84,7 @@ export function CanvasArea({
   const [zoomHint, setZoomHint] = useState<number | null>(null)
   const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const polygonRef = useRef<{ points: { x: number; y: number }[] } | null>(null)
 
   const showZoomHint = useCallback((zoom: number) => {
     setZoomHint(zoom)
@@ -103,6 +108,23 @@ export function CanvasArea({
   useLayoutEffect(() => {
     fitToViewport()
   }, [fitToViewport, state.fitRequest])
+
+  useEffect(() => {
+    if (state.tool !== 'polygon-lasso') {
+      polygonRef.current = null
+    }
+  }, [state.tool])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && polygonRef.current) {
+        polygonRef.current = null
+        setPreviewSel(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -195,8 +217,7 @@ export function CanvasArea({
     ctx.globalCompositeOperation = 'source-over'
   }
 
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 1 || (spacePan && e.button === 0)) {
+  const startPan = (e: React.MouseEvent) => {
       e.preventDefault()
       const origin = { panX: state.panX, panY: state.panY }
       dragRef.current = {
@@ -223,6 +244,12 @@ export function CanvasArea({
       }
       window.addEventListener('pointermove', onPanMove)
       window.addEventListener('pointerup', onPanUp)
+  }
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 1 || ((spacePan || state.tool === 'hand') && e.button === 0)) {
+      e.preventDefault()
+      startPan(e)
       return
     }
     if (e.button !== 0) return
@@ -230,6 +257,27 @@ export function CanvasArea({
     const { x, y } = docPointFromEvent(e)
     const tool = state.tool
     const layer = activeLayer
+
+    if (tool === 'polygon-lasso') {
+      const closeRadius = 10 / layoutRef.current.scale
+      const existing = polygonRef.current
+      if (existing && existing.points.length >= 3) {
+        const first = existing.points[0]!
+        if (Math.hypot(x - first.x, y - first.y) < closeRadius) {
+          dispatch({
+            type: 'SET_SELECTION',
+            selection: { type: 'lasso', points: existing.points },
+          })
+          polygonRef.current = null
+          setPreviewSel(null)
+          return
+        }
+      }
+      const points = existing ? [...existing.points, { x, y }] : [{ x, y }]
+      polygonRef.current = { points }
+      setPreviewSel({ type: 'lasso', points })
+      return
+    }
 
     if (tool === 'zoom') {
       const delta = e.altKey ? -25 : 25
@@ -326,7 +374,13 @@ export function CanvasArea({
     onCursorMove(raw.x, raw.y, sampleRgba(raw.x, raw.y))
 
     const drag = dragRef.current
-    if (!drag) return
+    if (!drag) {
+      if (state.tool === 'polygon-lasso' && polygonRef.current) {
+        const pts = polygonRef.current.points
+        setPreviewSel({ type: 'lasso', points: [...pts, { x, y }] })
+      }
+      return
+    }
     if (drag.type === 'pan') return
 
     const tool = drag.type
@@ -380,6 +434,7 @@ export function CanvasArea({
       (tool === 'shape-rect' ||
         tool === 'shape-ellipse' ||
         tool === 'shape-line' ||
+        tool === 'shape-arrow' ||
         tool === 'gradient') &&
       activeLayer
     ) {
@@ -465,6 +520,7 @@ export function CanvasArea({
         'shape-rect',
         'shape-ellipse',
         'shape-line',
+        'shape-arrow',
       ])
 
       if (drag.type === 'gradient') {
@@ -539,11 +595,29 @@ export function CanvasArea({
         commitHistory('Line')
       }
 
+      if (drag.type === 'shape-arrow') {
+        ctx.strokeStyle = shape.strokeColor
+        ctx.fillStyle = shape.strokeColor
+        ctx.lineWidth = shape.strokeWidth
+        drawArrow(
+          ctx,
+          drag.startX,
+          drag.startY,
+          endX,
+          endY,
+          shape.strokeWidth,
+          shape.lineCap,
+        )
+        commitHistory('Arrow')
+      }
+
       if (shapeTools.has(drag.type)) {
         const r = normalizeRect(drag.startX, drag.startY, endX, endY)
         const lineLen = Math.hypot(endX - drag.startX, endY - drag.startY)
         const hasSize =
-          drag.type === 'shape-line' ? lineLen > 1 : r.width > 1 || r.height > 1
+          drag.type === 'shape-line' || drag.type === 'shape-arrow'
+            ? lineLen > 1
+            : r.width > 1 || r.height > 1
         if (hasSize) {
           setShapeCommitFlash({
             kind: drag.type as ShapeDrawPreview['kind'],
@@ -670,7 +744,11 @@ export function CanvasArea({
     }
   }, [dispatch, showZoomHint])
 
-  const cursor = spacePan ? 'grabbing' : (CURSORS[state.tool] ?? 'default')
+  const cursor = spacePan
+    ? 'grabbing'
+    : state.tool === 'hand'
+      ? 'grab'
+      : (CURSORS[state.tool] ?? 'default')
   return (
     <div
       ref={containerRef}

@@ -36,7 +36,7 @@ function LayerThumb({ canvas }: { canvas: HTMLCanvasElement }) {
 }
 
 export function LayersPanel() {
-  const { state, dispatch } = useEditor()
+  const { state, dispatch, addLayer } = useEditor()
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState('')
   const dragIdx = useRef<number | null>(null)
@@ -198,7 +198,7 @@ export function LayersPanel() {
             icon: Plus,
             label: 'New layer',
             description: 'Adds an empty layer above the current one.',
-            onClick: () => dispatch({ type: 'ADD_LAYER' }),
+            onClick: () => addLayer(),
             disabled: false,
           },
           {

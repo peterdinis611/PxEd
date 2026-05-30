@@ -14,9 +14,11 @@ export type BlendMode =
 
 export type ToolName =
   | 'move'
+  | 'hand'
   | 'marquee-rect'
   | 'marquee-ellipse'
   | 'lasso'
+  | 'polygon-lasso'
   | 'magic-wand'
   | 'crop'
   | 'brush'
@@ -29,6 +31,7 @@ export type ToolName =
   | 'shape-rect'
   | 'shape-ellipse'
   | 'shape-line'
+  | 'shape-arrow'
   | 'zoom'
 
 export interface TextData {

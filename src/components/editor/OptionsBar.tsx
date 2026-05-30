@@ -89,9 +89,11 @@ function OptionsStrip({ children }: { children: React.ReactNode }) {
 
 const TOOL_LABELS: Record<ToolName, string> = {
   move: 'Move',
+  hand: 'Hand',
   'marquee-rect': 'Rect Select',
   'marquee-ellipse': 'Ellipse Select',
   lasso: 'Lasso',
+  'polygon-lasso': 'Polygon Lasso',
   'magic-wand': 'Magic Wand',
   crop: 'Crop',
   brush: 'Brush',
@@ -104,6 +106,7 @@ const TOOL_LABELS: Record<ToolName, string> = {
   'shape-rect': 'Rectangle',
   'shape-ellipse': 'Ellipse',
   'shape-line': 'Line',
+  'shape-arrow': 'Arrow',
   zoom: 'Zoom',
 }
 
@@ -268,6 +271,16 @@ export function OptionsBar() {
               <span className="text-ui-xs text-zinc-500">Drag to draw selection</span>
             )}
 
+            {tool === 'polygon-lasso' && (
+              <span className="text-ui-xs text-zinc-500">
+                Click to add points · click start to close · Esc to cancel
+              </span>
+            )}
+
+            {tool === 'hand' && (
+              <span className="text-ui-xs text-zinc-500">Drag to pan · Space also pans</span>
+            )}
+
             {tool === 'magic-wand' && (
               <OptionsStrip>
                 <SliderControl label="Tolerance" value={state.magicWandTolerance} min={0} max={255} onChange={(v) => dispatch({ type: 'SET_TOLERANCE', magic: v })} />
@@ -333,7 +346,10 @@ export function OptionsBar() {
               </OptionsStrip>
             )}
 
-            {(tool === 'shape-rect' || tool === 'shape-ellipse' || tool === 'shape-line') && (
+            {(tool === 'shape-rect' ||
+              tool === 'shape-ellipse' ||
+              tool === 'shape-line' ||
+              tool === 'shape-arrow') && (
               <OptionsStrip>
                 <input type="color" value={shape.fillColor} onChange={(e) => setShape({ fillColor: e.target.value })} className="h-7 w-7 cursor-pointer rounded border border-zinc-600 bg-transparent" title="Fill" />
                 <input type="color" value={shape.strokeColor} onChange={(e) => setShape({ strokeColor: e.target.value })} className="h-7 w-7 cursor-pointer rounded border border-zinc-600 bg-transparent" title="Stroke" />

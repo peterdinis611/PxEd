@@ -382,7 +382,7 @@ function PreviewBody({
           filled={shape.filled}
         />
       )}
-      {kind === 'shape-line' && (
+      {(kind === 'shape-line' || kind === 'shape-arrow') && (
         <PreviewLine
           startX={startX}
           startY={startY}
@@ -401,7 +401,7 @@ function PreviewBody({
           bg={backgroundColor}
         />
       )}
-      {kind !== 'shape-line' && (
+      {kind !== 'shape-line' && kind !== 'shape-arrow' && (
         <SizeLabel
           x={r.x}
           y={r.y}

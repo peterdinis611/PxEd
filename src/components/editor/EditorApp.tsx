@@ -80,7 +80,7 @@ function EditorShell() {
       className="editor-shell editor-ui fixed inset-0 grid overflow-hidden text-zinc-100"
       style={{
         gridTemplateRows: '28px minmax(0, max-content) minmax(0, 1fr) 24px',
-        gridTemplateColumns: '48px minmax(0, 1fr) 272px',
+        gridTemplateColumns: '52px minmax(0, 1fr) 272px',
         gridTemplateAreas: `
           "menu menu menu"
           "options options options"
@@ -90,7 +90,13 @@ function EditorShell() {
       }}
     >
       <header style={{ gridArea: 'menu' }} className="min-h-0 overflow-hidden">
-        <MenuBar />
+        <MenuBar
+          onSelectAll={onSelectAll}
+          onDeselect={onDeselect}
+          onCopy={onCopy}
+          onPaste={onPaste}
+          onClear={onDelete}
+        />
       </header>
 
       <div

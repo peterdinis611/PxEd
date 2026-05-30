@@ -4,7 +4,9 @@ import type { ToolName } from '@/types/editor'
 
 const TOOL_KEYS: Record<string, ToolName> = {
   v: 'move',
+  h: 'hand',
   m: 'marquee-rect',
+  o: 'marquee-ellipse',
   l: 'lasso',
   w: 'magic-wand',
   c: 'crop',
@@ -15,6 +17,7 @@ const TOOL_KEYS: Record<string, ToolName> = {
   i: 'eyedropper',
   t: 'text',
   u: 'shape-rect',
+  n: 'shape-line',
   z: 'zoom',
 }
 
@@ -24,9 +27,9 @@ export function useKeyboardShortcuts(
   onDeselect: () => void,
   onCopy: () => void,
   onPaste: () => void,
-  onDelete: () => void,
+  onClear: () => void,
 ) {
-  const { state, dispatch } = useEditor()
+  const { state, dispatch, addLayer } = useEditor()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -46,6 +49,18 @@ export function useKeyboardShortcuts(
         return
       }
 
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        addLayer()
+        return
+      }
+      if (mod && e.key.toLowerCase() === 'j') {
+        e.preventDefault()
+        if (state.activeLayerId) {
+          dispatch({ type: 'DUPLICATE_LAYER', id: state.activeLayerId })
+        }
+        return
+      }
       if (mod && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         dispatch({ type: 'UNDO' })
@@ -71,6 +86,12 @@ export function useKeyboardShortcuts(
         onCopy()
         return
       }
+      if (mod && e.key === 'x') {
+        e.preventDefault()
+        onCopy()
+        onClear()
+        return
+      }
       if (mod && e.key === 'v') {
         e.preventDefault()
         onPaste()
@@ -79,11 +100,11 @@ export function useKeyboardShortcuts(
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (!mod) {
           e.preventDefault()
-          onDelete()
+          onClear()
         }
         return
       }
-      if (e.key === 'x' || e.key === 'X') {
+      if (!mod && (e.key === 'x' || e.key === 'X')) {
         dispatch({ type: 'SWAP_COLORS' })
         return
       }
@@ -109,9 +130,21 @@ export function useKeyboardShortcuts(
         dispatch({ type: 'SET_TOOL', tool: 'gradient' })
         return
       }
+      if (e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+        dispatch({ type: 'SET_TOOL', tool: 'polygon-lasso' })
+        return
+      }
+      if (e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        dispatch({ type: 'SET_TOOL', tool: 'shape-arrow' })
+        return
+      }
+      if (e.shiftKey && (e.key === 'u' || e.key === 'U')) {
+        dispatch({ type: 'SET_TOOL', tool: 'shape-ellipse' })
+        return
+      }
 
       const tool = TOOL_KEYS[e.key.toLowerCase()]
-      if (tool && !mod) {
+      if (tool && !mod && !e.shiftKey) {
         dispatch({ type: 'SET_TOOL', tool })
       }
     }
@@ -128,12 +161,14 @@ export function useKeyboardShortcuts(
     }
   }, [
     dispatch,
+    addLayer,
+    state.activeLayerId,
     state.brush.size,
     setSpacePan,
     onSelectAll,
     onDeselect,
     onCopy,
     onPaste,
-    onDelete,
+    onClear,
   ])
 }
