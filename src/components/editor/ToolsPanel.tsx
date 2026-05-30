@@ -17,7 +17,6 @@ import {
   ZoomIn,
   Blend,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ColorsDock } from '@/components/editor/ColorsDock'
 import { ToolTooltip } from '@/components/editor/ToolTooltip'

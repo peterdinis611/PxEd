@@ -10,6 +10,7 @@ import { renderComposite, screenToDoc } from '@/lib/canvas/composite'
 import { computeFitViewport, type ViewportLayout } from '@/lib/canvas/viewport'
 import { floodFill, magicWandSelect } from '@/lib/canvas/floodFill'
 import { normalizeRect } from '@/lib/canvas/selection'
+import { snapPoint } from '@/lib/canvas/snap'
 import { createLayer, renderTextLayer } from '@/lib/canvas/layers'
 import { useEditor } from '@/context/EditorContext'
 import type { Selection } from '@/types/editor'
@@ -63,7 +64,7 @@ export function CanvasArea({
     lastX: number
     lastY: number
     points?: { x: number; y: number }[]
-    panStart?: { scrollLeft: number; scrollTop: number }
+    panStart?: { panX: number; panY: number }
     layerOffset?: { x: number; y: number }
   } | null>(null)
 
@@ -89,8 +90,6 @@ export function CanvasArea({
     if (!el) return
     setViewport({ w: el.clientWidth, h: el.clientHeight })
     dispatch({ type: 'SET_VIEWPORT', ...computeFitViewport() })
-    el.scrollLeft = 0
-    el.scrollTop = 0
   }, [dispatch])
 
   useLayoutEffect(() => {
@@ -111,6 +110,17 @@ export function CanvasArea({
     if (!rect) return { x: 0, y: 0 }
     return screenToDoc(e.clientX, e.clientY, rect, layoutRef.current)
   }, [])
+
+  const docPointFromEvent = useCallback(
+    (e: React.MouseEvent | MouseEvent) => {
+      const p = getDocPoint(e)
+      return snapPoint(p.x, p.y, state.gridSize, state.snapToGrid)
+    },
+    [getDocPoint, state.gridSize, state.snapToGrid],
+  )
+
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const render = useCallback(() => {
     const canvas = displayRef.current
@@ -211,23 +221,37 @@ export function CanvasArea({
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1 || (spacePan && e.button === 0)) {
-      const el = containerRef.current
+      e.preventDefault()
+      const origin = { panX: state.panX, panY: state.panY }
       dragRef.current = {
         type: 'pan',
         startX: e.clientX,
         startY: e.clientY,
         lastX: e.clientX,
         lastY: e.clientY,
-        panStart: {
-          scrollLeft: el?.scrollLeft ?? 0,
-          scrollTop: el?.scrollTop ?? 0,
-        },
+        panStart: origin,
       }
+      const onPanMove = (ev: PointerEvent) => {
+        const d = dragRef.current
+        if (!d || d.type !== 'pan' || !d.panStart) return
+        dispatch({
+          type: 'SET_PAN',
+          panX: d.panStart.panX + (ev.clientX - d.startX),
+          panY: d.panStart.panY + (ev.clientY - d.startY),
+        })
+      }
+      const onPanUp = () => {
+        if (dragRef.current?.type === 'pan') dragRef.current = null
+        window.removeEventListener('pointermove', onPanMove)
+        window.removeEventListener('pointerup', onPanUp)
+      }
+      window.addEventListener('pointermove', onPanMove)
+      window.addEventListener('pointerup', onPanUp)
       return
     }
     if (e.button !== 0) return
 
-    const { x, y } = getDocPoint(e)
+    const { x, y } = docPointFromEvent(e)
     const tool = state.tool
     const layer = activeLayer
 
@@ -321,18 +345,13 @@ export function CanvasArea({
   }
 
   const onMouseMove = (e: React.MouseEvent) => {
-    const { x, y } = getDocPoint(e)
-    onCursorMove(x, y, sampleRgba(x, y))
+    const raw = getDocPoint(e)
+    const { x, y } = snapPoint(raw.x, raw.y, state.gridSize, state.snapToGrid)
+    onCursorMove(raw.x, raw.y, sampleRgba(raw.x, raw.y))
 
     const drag = dragRef.current
     if (!drag) return
-
-    if (drag.type === 'pan' && drag.panStart && containerRef.current) {
-      const el = containerRef.current
-      el.scrollLeft = drag.panStart.scrollLeft - (e.clientX - drag.startX)
-      el.scrollTop = drag.panStart.scrollTop - (e.clientY - drag.startY)
-      return
-    }
+    if (drag.type === 'pan') return
 
     const tool = drag.type
 
@@ -615,12 +634,19 @@ export function CanvasArea({
     const el = containerRef.current
     if (!el) return
     const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const s = stateRef.current
       if (e.ctrlKey || e.metaKey) {
-        e.preventDefault()
         const delta = e.deltaY > 0 ? -10 : 10
-        const next = state.zoom + delta
+        const next = s.zoom + delta
         dispatch({ type: 'SET_ZOOM', zoom: next })
         showZoomHint(next)
+      } else {
+        dispatch({
+          type: 'SET_PAN',
+          panX: s.panX - e.deltaX,
+          panY: s.panY - e.deltaY,
+        })
       }
     }
     el.addEventListener('wheel', onWheel, { passive: false })
@@ -628,7 +654,7 @@ export function CanvasArea({
       el.removeEventListener('wheel', onWheel)
       if (zoomHintTimer.current) clearTimeout(zoomHintTimer.current)
     }
-  }, [state.zoom, dispatch, showZoomHint])
+  }, [dispatch, showZoomHint])
 
   const cursor = spacePan ? 'grabbing' : (CURSORS[state.tool] ?? 'default')
   return (

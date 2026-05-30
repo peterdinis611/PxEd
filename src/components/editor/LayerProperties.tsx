@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { useEditor } from '@/context/EditorContext'
+import { snapCoord } from '@/lib/canvas/snap'
 import type { BlendMode } from '@/types/editor'
 
 const BLEND_MODES: BlendMode[] = [
@@ -30,6 +31,8 @@ export function LayerProperties() {
   const { state, dispatch } = useEditor()
   const active = state.layers.find((l) => l.id === state.activeLayerId)
 
+  const snap = (n: number) => snapCoord(n, state.gridSize, state.snapToGrid)
+
   if (!active) return null
 
   return (
@@ -41,13 +44,13 @@ export function LayerProperties() {
             type="number"
             className="mt-0.5 h-7 px-1.5 text-ui-xs tabular-nums"
             value={Math.round(active.x)}
-            onChange={(e) =>
-              dispatch({
-                type: 'UPDATE_LAYER',
-                id: active.id,
-                patch: { x: +e.target.value },
-              })
-            }
+              onChange={(e) =>
+                dispatch({
+                  type: 'UPDATE_LAYER',
+                  id: active.id,
+                  patch: { x: snap(+e.target.value) },
+                })
+              }
           />
         </div>
         <div>
@@ -56,13 +59,13 @@ export function LayerProperties() {
             type="number"
             className="mt-0.5 h-7 px-1.5 text-ui-xs tabular-nums"
             value={Math.round(active.y)}
-            onChange={(e) =>
-              dispatch({
-                type: 'UPDATE_LAYER',
-                id: active.id,
-                patch: { y: +e.target.value },
-              })
-            }
+              onChange={(e) =>
+                dispatch({
+                  type: 'UPDATE_LAYER',
+                  id: active.id,
+                  patch: { y: snap(+e.target.value) },
+                })
+              }
           />
         </div>
         <p className="pb-1 text-right text-ui-xs tabular-nums text-zinc-500">

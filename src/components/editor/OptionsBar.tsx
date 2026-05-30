@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { ColorPicker } from '@/components/editor/ColorPicker'
+import { snapCoord } from '@/lib/canvas/snap'
 import { useEditor } from '@/context/EditorContext'
 import { fadeSlideRight } from '@/lib/motion'
 import type { ToolName } from '@/types/editor'
@@ -238,11 +239,11 @@ export function OptionsBar() {
               <OptionsStrip>
                 <label className="flex items-center gap-1 text-ui-xs text-zinc-500">
                   X
-                  <Input type="number" className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums" value={Math.round(activeLayer.x)} onChange={(e) => dispatch({ type: 'UPDATE_LAYER', id: activeLayer.id, patch: { x: +e.target.value } })} />
+                  <Input type="number" className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums" value={Math.round(activeLayer.x)} onChange={(e) => dispatch({ type: 'UPDATE_LAYER', id: activeLayer.id, patch: { x: snapCoord(+e.target.value, state.gridSize, state.snapToGrid) } })} />
                 </label>
                 <label className="flex items-center gap-1 text-ui-xs text-zinc-500">
                   Y
-                  <Input type="number" className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums" value={Math.round(activeLayer.y)} onChange={(e) => dispatch({ type: 'UPDATE_LAYER', id: activeLayer.id, patch: { y: +e.target.value } })} />
+                  <Input type="number" className="h-7 w-14 px-1 text-center text-ui-xs tabular-nums" value={Math.round(activeLayer.y)} onChange={(e) => dispatch({ type: 'UPDATE_LAYER', id: activeLayer.id, patch: { y: snapCoord(+e.target.value, state.gridSize, state.snapToGrid) } })} />
                 </label>
                 <ToggleBtn active={state.snapToGrid} onClick={() => dispatch({ type: 'SET_VIEW_OPTS', patch: { snapToGrid: !state.snapToGrid } })}>Snap</ToggleBtn>
               </OptionsStrip>
