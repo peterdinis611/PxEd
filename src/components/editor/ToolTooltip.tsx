@@ -25,7 +25,7 @@ export function ToolTooltip({
         <p className="mt-0.5 text-ui-xs leading-snug text-zinc-400">{description}</p>
         {shortcut ? (
           <p className="mt-1.5 text-ui-xs text-zinc-500">
-            Klávesa:{' '}
+            Shortcut:{' '}
             <kbd className="rounded bg-zinc-700/90 px-1 py-0.5 font-mono text-zinc-300">
               {shortcut}
             </kbd>

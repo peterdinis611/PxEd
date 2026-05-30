@@ -24,7 +24,7 @@ export function ColorsDock() {
           color={state.backgroundColor}
           onChange={(c) => setColor('bg', c)}
           recentColors={state.recentColors}
-          label="Pozadie (BG)"
+          label="Background (BG)"
         >
           <button
             type="button"
@@ -33,7 +33,7 @@ export function ColorsDock() {
               'ring-1 ring-zinc-600',
             )}
             style={{ backgroundColor: state.backgroundColor }}
-            aria-label="Pozadie"
+            aria-label="Background"
           />
         </ColorPicker>
 
@@ -41,7 +41,7 @@ export function ColorsDock() {
           color={state.foregroundColor}
           onChange={(c) => setColor('fg', c)}
           recentColors={state.recentColors}
-          label="Popredie (FG)"
+          label="Foreground (FG)"
         >
           <button
             type="button"
@@ -50,7 +50,7 @@ export function ColorsDock() {
               'ring-1 ring-zinc-500',
             )}
             style={{ backgroundColor: state.foregroundColor }}
-            aria-label="Popredie"
+            aria-label="Foreground"
           />
         </ColorPicker>
       </div>
@@ -61,8 +61,8 @@ export function ColorsDock() {
 
       <div className="flex gap-0.5">
         <ToolTooltip
-          label="Vymeniť farby"
-          description="Prehodí poprednú a pozadím farbu."
+          label="Swap colors"
+          description="Swaps the foreground and background colors."
           shortcut="X"
         >
           <Button
@@ -75,8 +75,8 @@ export function ColorsDock() {
           </Button>
         </ToolTooltip>
         <ToolTooltip
-          label="Predvolené"
-          description="Čierna popredie, biele pozadie."
+          label="Default colors"
+          description="Black foreground, white background."
           shortcut="D"
         >
           <Button

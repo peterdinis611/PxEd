@@ -5,7 +5,7 @@ import {
   type ViewportLayout,
 } from '@/lib/canvas/viewport'
 
-function drawCheckerboard(
+export function drawCheckerboard(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,

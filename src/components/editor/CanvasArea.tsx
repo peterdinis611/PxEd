@@ -6,14 +6,18 @@ import {
   useState,
 } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { renderComposite, screenToDoc } from '@/lib/canvas/composite'
+import { screenToDoc } from '@/lib/canvas/composite'
 import { computeFitViewport, type ViewportLayout } from '@/lib/canvas/viewport'
+import { EditorKonvaStage } from '@/components/editor/EditorKonvaStage'
+import type Konva from 'konva'
 import { floodFill, magicWandSelect } from '@/lib/canvas/floodFill'
 import { normalizeRect } from '@/lib/canvas/selection'
 import { snapPoint } from '@/lib/canvas/snap'
 import { createLayer, renderTextLayer } from '@/lib/canvas/layers'
+import { ShapeDrawPreviewOverlay } from '@/components/editor/ShapeDrawPreview'
 import { useEditor } from '@/context/EditorContext'
 import type { Selection } from '@/types/editor'
+import type { ShapeDrawPreview } from '@/types/shapePreview'
 
 const CURSORS: Record<string, string> = {
   move: 'move',
@@ -45,8 +49,8 @@ export function CanvasArea({
   const { state, dispatch, activeLayer, commitHistory, updateActiveLayerCanvas } =
     useEditor()
   const containerRef = useRef<HTMLDivElement>(null)
-  const displayRef = useRef<HTMLCanvasElement>(null)
-  const layoutRef = useRef<ViewportLayout>({
+  const stageRef = useRef<Konva.Stage>(null)
+  const [layout, setLayout] = useState<ViewportLayout>({
     scale: 1,
     drawW: 800,
     drawH: 600,
@@ -55,8 +59,8 @@ export function CanvasArea({
     canvasW: 800,
     canvasH: 600,
   })
-  const rafRef = useRef<number>(0)
-
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   const dragRef = useRef<{
     type: string
     startX: number
@@ -69,6 +73,10 @@ export function CanvasArea({
   } | null>(null)
 
   const [previewSel, setPreviewSel] = useState<Selection | null>(null)
+  const [shapePreview, setShapePreview] = useState<ShapeDrawPreview | null>(null)
+  const [shapeCommitFlash, setShapeCommitFlash] = useState<ShapeDrawPreview | null>(
+    null,
+  )
   const [zoomHint, setZoomHint] = useState<number | null>(null)
   const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -106,7 +114,8 @@ export function CanvasArea({
   }, [updateViewportSize])
 
   const getDocPoint = useCallback((e: React.MouseEvent | MouseEvent) => {
-    const rect = displayRef.current?.getBoundingClientRect()
+    const el = stageRef.current?.container() ?? containerRef.current
+    const rect = el?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
     return screenToDoc(e.clientX, e.clientY, rect, layoutRef.current)
   }, [])
@@ -122,42 +131,9 @@ export function CanvasArea({
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const render = useCallback(() => {
-    const canvas = displayRef.current
-    const container = containerRef.current
-    if (!canvas || !container) return
-    const vw = container.clientWidth
-    const vh = container.clientHeight
-    if (vw < 1 || vh < 1) return
-    layoutRef.current = renderComposite(
-      canvas,
-      state.layers,
-      state.canvasWidth,
-      state.canvasHeight,
-      vw,
-      vh,
-      state.zoom,
-      state.panX,
-      state.panY,
-    )
-  }, [
-    state.layers,
-    state.canvasWidth,
-    state.canvasHeight,
-    state.zoom,
-    state.panX,
-    state.panY,
-    state.renderTick,
-  ])
-
-  useEffect(() => {
-    const loop = () => {
-      render()
-      rafRef.current = requestAnimationFrame(loop)
-    }
-    rafRef.current = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafRef.current)
-  }, [render])
+  const handleLayout = useCallback((next: ViewportLayout) => {
+    setLayout(next)
+  }, [])
 
   const sampleColor = (x: number, y: number) => {
     const layer = activeLayer
@@ -407,21 +383,32 @@ export function CanvasArea({
         tool === 'gradient') &&
       activeLayer
     ) {
-      setPreviewSel({
-        type: 'rect',
-        ...normalizeRect(drag.startX, drag.startY, x, y),
+      drag.lastX = x
+      drag.lastY = y
+      setShapePreview({
+        kind: tool as ShapeDrawPreview['kind'],
+        startX: drag.startX,
+        startY: drag.startY,
+        endX: x,
+        endY: y,
       })
+      return
     }
   }
 
-  const onMouseUp = () => {
+  const onMouseUp = (e?: React.MouseEvent) => {
     const drag = dragRef.current
     if (!drag) return
     dragRef.current = null
 
     const layer = activeLayer
-    const endX = drag.lastX
-    const endY = drag.lastY
+    let endX = drag.lastX
+    let endY = drag.lastY
+    if (e) {
+      const p = docPointFromEvent(e)
+      endX = p.x
+      endY = p.y
+    }
 
     if (
       (drag.type === 'marquee-rect' || drag.type === 'marquee-ellipse') &&
@@ -473,13 +460,22 @@ export function CanvasArea({
       const ctx = layer.canvas.getContext('2d')!
       const { shape, foregroundColor, backgroundColor } = state
 
+      const shapeTools = new Set([
+        'gradient',
+        'shape-rect',
+        'shape-ellipse',
+        'shape-line',
+      ])
+
       if (drag.type === 'gradient') {
         const g = ctx.createLinearGradient(drag.startX, drag.startY, endX, endY)
         g.addColorStop(0, foregroundColor)
         g.addColorStop(1, backgroundColor)
         ctx.fillStyle = g
         const r = normalizeRect(drag.startX, drag.startY, endX, endY)
-        ctx.fillRect(r.x, r.y, r.width, r.height)
+        if (r.width > 0 || r.height > 0) {
+          ctx.fillRect(r.x, r.y, r.width, r.height)
+        }
         commitHistory('Gradient')
       }
 
@@ -543,6 +539,24 @@ export function CanvasArea({
         commitHistory('Line')
       }
 
+      if (shapeTools.has(drag.type)) {
+        const r = normalizeRect(drag.startX, drag.startY, endX, endY)
+        const lineLen = Math.hypot(endX - drag.startX, endY - drag.startY)
+        const hasSize =
+          drag.type === 'shape-line' ? lineLen > 1 : r.width > 1 || r.height > 1
+        if (hasSize) {
+          setShapeCommitFlash({
+            kind: drag.type as ShapeDrawPreview['kind'],
+            startX: drag.startX,
+            startY: drag.startY,
+            endX,
+            endY,
+          })
+        }
+        setShapePreview(null)
+        dispatch({ type: 'BUMP_RENDER' })
+      }
+
       if (
         drag.type === 'brush' ||
         drag.type === 'pencil' ||
@@ -555,6 +569,7 @@ export function CanvasArea({
     }
 
     setPreviewSel(null)
+    setShapePreview(null)
   }
 
   const sampleRgba = (x: number, y: number): string => {
@@ -569,7 +584,6 @@ export function CanvasArea({
   }
 
   const sel = previewSel ?? state.selection
-  const layout = layoutRef.current
   const { scale: viewScale, offsetX, offsetY, canvasW, canvasH } = layout
   const fillsPanel =
     canvasW <= (viewport.w || canvasW) + 1 && canvasH <= (viewport.h || canvasH) + 1
@@ -664,8 +678,8 @@ export function CanvasArea({
       style={{ cursor }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
+      onMouseUp={(e) => onMouseUp(e)}
+      onMouseLeave={(e) => onMouseUp(e)}
     >
       <div
         className="relative min-h-full min-w-full"
@@ -686,8 +700,7 @@ export function CanvasArea({
           />
         )}
 
-        <canvas
-          ref={displayRef}
+        <div
           className="canvas-document block"
           style={{
             width: fillsPanel ? '100%' : canvasW,
@@ -695,10 +708,34 @@ export function CanvasArea({
             minWidth: viewport.w || undefined,
             minHeight: viewport.h || undefined,
           }}
+        >
+          <EditorKonvaStage
+            stageRef={stageRef}
+            layers={state.layers}
+            docWidth={state.canvasWidth}
+            docHeight={state.canvasHeight}
+            viewportW={viewport.w}
+            viewportH={viewport.h}
+            zoom={state.zoom}
+            panX={state.panX}
+            panY={state.panY}
+            renderTick={state.renderTick}
+            onLayout={handleLayout}
+          />
+        </div>
+
+        <ShapeDrawPreviewOverlay
+          preview={shapePreview}
+          commitFlash={shapeCommitFlash}
+          layout={layout}
+          shape={state.shape}
+          foregroundColor={state.foregroundColor}
+          backgroundColor={state.backgroundColor}
+          onCommitFlashDone={() => setShapeCommitFlash(null)}
         />
 
         <svg
-          className="pointer-events-none absolute left-0 top-0"
+          className="pointer-events-none absolute left-0 top-0 z-[5]"
           width={fillsPanel ? viewport.w : canvasW}
           height={fillsPanel ? viewport.h : canvasH}
         >

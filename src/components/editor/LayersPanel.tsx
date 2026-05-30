@@ -112,11 +112,11 @@ export function LayersPanel() {
                   onDoubleClick={() => startRename(layer.id, layer.name)}
                 >
                   <ToolTooltip
-                    label={layer.visible ? 'Skryť vrstvu' : 'Zobraziť vrstvu'}
+                    label={layer.visible ? 'Hide layer' : 'Show layer'}
                     description={
                       layer.visible
-                        ? 'Vrstva sa nebude kresliť na plátno, ale zostane v zozname.'
-                        : 'Znova zobrazí vrstvu na plátne.'
+                        ? 'Layer will not be drawn on the canvas but stays in the list.'
+                        : 'Shows the layer on the canvas again.'
                     }
                     side="left"
                   >
@@ -141,11 +141,11 @@ export function LayersPanel() {
                     </Button>
                   </ToolTooltip>
                   <ToolTooltip
-                    label={layer.locked ? 'Odomknúť vrstvu' : 'Zamknúť vrstvu'}
+                    label={layer.locked ? 'Unlock layer' : 'Lock layer'}
                     description={
                       layer.locked
-                        ? 'Povolí úpravy a kreslenie na tejto vrstve.'
-                        : 'Zabráni kresleniu a úpravám na tejto vrstve.'
+                        ? 'Allows editing and painting on this layer.'
+                        : 'Prevents painting and edits on this layer.'
                     }
                     side="left"
                   >
@@ -196,15 +196,15 @@ export function LayersPanel() {
         {[
           {
             icon: Plus,
-            label: 'Nová vrstva',
-            description: 'Pridá prázdnu vrstvu nad aktuálnu.',
+            label: 'New layer',
+            description: 'Adds an empty layer above the current one.',
             onClick: () => dispatch({ type: 'ADD_LAYER' }),
             disabled: false,
           },
           {
             icon: Copy,
-            label: 'Duplikovať',
-            description: 'Vytvorí kópiu aktívnej vrstvy vrátane obsahu.',
+            label: 'Duplicate',
+            description: 'Creates a copy of the active layer including its content.',
             onClick: () =>
               state.activeLayerId &&
               dispatch({ type: 'DUPLICATE_LAYER', id: state.activeLayerId }),
@@ -212,8 +212,8 @@ export function LayersPanel() {
           },
           {
             icon: Trash2,
-            label: 'Zmazať vrstvu',
-            description: 'Odstráni aktívnu vrstvu. Posledná vrstva sa zmazať nedá.',
+            label: 'Delete layer',
+            description: 'Removes the active layer. The last layer cannot be deleted.',
             onClick: () =>
               state.activeLayerId &&
               dispatch({ type: 'DELETE_LAYER', id: state.activeLayerId }),

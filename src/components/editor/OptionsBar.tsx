@@ -155,7 +155,7 @@ export function OptionsBar() {
             color={state.foregroundColor}
             onChange={(c) => setColor('fg', c)}
             recentColors={state.recentColors}
-            label="Popredie (FG)"
+            label="Foreground (FG)"
           >
             <button
               type="button"
@@ -174,7 +174,7 @@ export function OptionsBar() {
             color={state.backgroundColor}
             onChange={(c) => setColor('bg', c)}
             recentColors={state.recentColors}
-            label="Pozadie (BG)"
+            label="Background (BG)"
           >
             <button
               type="button"
@@ -193,7 +193,7 @@ export function OptionsBar() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 shrink-0 text-zinc-500"
-            title="Vymeniť FG/BG (X)"
+            title="Swap FG/BG (X)"
             onClick={() => dispatch({ type: 'SWAP_COLORS' })}
           >
             ⇄

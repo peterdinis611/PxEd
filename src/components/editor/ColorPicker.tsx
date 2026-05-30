@@ -221,7 +221,7 @@ export function ColorPicker({
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 shrink-0"
-                title="Kopírovať hex"
+                title="Copy hex"
                 onClick={copyHex}
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -229,7 +229,7 @@ export function ColorPicker({
             </div>
             <label className="flex cursor-pointer items-center gap-2 text-ui-xs text-zinc-500">
               <Pipette className="h-3.5 w-3.5" />
-              Systémový výber
+              System picker
               <input
                 type="color"
                 value={hex}
@@ -287,7 +287,7 @@ export function ColorPicker({
         </div>
 
         <div className="mt-3">
-          <Label className="text-ui-xs text-zinc-500">Predvoľby</Label>
+          <Label className="text-ui-xs text-zinc-500">Presets</Label>
           <div className="mt-1.5 grid grid-cols-8 gap-1">
             {COLOR_PRESETS.map((c) => (
               <button
@@ -310,7 +310,7 @@ export function ColorPicker({
 
         {recentColors.length > 0 && (
           <div className="mt-3">
-            <Label className="text-ui-xs text-zinc-500">Nedávne</Label>
+            <Label className="text-ui-xs text-zinc-500">Recent</Label>
             <div className="mt-1.5 flex flex-wrap gap-1">
               {recentColors.map((c) => (
                 <button
