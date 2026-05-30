@@ -1,47 +1,28 @@
-import { useRef, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Copy,
-  Eye,
-  EyeOff,
-  Lock,
-  Plus,
-  Trash2,
-  Unlock,
-} from 'lucide-react'
+import { useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { Copy, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { LayerRow } from '@/components/editor/LayerRow'
 import { ToolTooltip } from '@/components/editor/ToolTooltip'
 import { useEditor } from '@/context/EditorContext'
-import { cn } from '@/lib/utils'
-import { springSnappy, staggerContainer, staggerItem } from '@/lib/motion'
 
-function LayerThumb({ canvas }: { canvas: HTMLCanvasElement }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const max = 28
-    const scale = Math.min(max / canvas.width, max / canvas.height, 1)
-    el.width = Math.max(1, canvas.width * scale)
-    el.height = Math.max(1, canvas.height * scale)
-    el.getContext('2d')?.drawImage(canvas, 0, 0, el.width, el.height)
-  }, [canvas])
-  return (
-    <canvas
-      ref={ref}
-      className="h-7 w-7 shrink-0 rounded border border-zinc-700/80 bg-zinc-800"
-    />
-  )
-}
+const LAYER_ROW_HEIGHT = 32
 
 export function LayersPanel() {
   const { state, dispatch, addLayer } = useEditor()
   const [renaming, setRenaming] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState('')
   const dragIdx = useRef<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const layers = [...state.layers].reverse()
+
+  const virtualizer = useVirtualizer({
+    count: layers.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => LAYER_ROW_HEIGHT,
+    overscan: 6,
+  })
 
   const startRename = (id: string, name: string) => {
     setRenaming(id)
@@ -65,27 +46,53 @@ export function LayersPanel() {
         <span>Layers</span>
       </div>
 
-      <div className="smooth-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1.5">
-        <motion.div
-          className="space-y-0.5 p-1"
-          variants={staggerContainer}
-          initial="initial"
-          animate="animate"
+      <div
+        ref={scrollRef}
+        className="smooth-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1.5"
+      >
+        <div
+          className="relative w-full p-1"
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
         >
-          <AnimatePresence initial={false}>
-            {layers.map((layer) => {
-              const realIdx = state.layers.findIndex((l) => l.id === layer.id)
-              const isActive = layer.id === state.activeLayerId
-              return (
-                <motion.div
-                  key={layer.id}
-                  layout
-                  variants={staggerItem}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={springSnappy}
-                  draggable
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const layer = layers[virtualRow.index]!
+            const realIdx = state.layers.findIndex((l) => l.id === layer.id)
+            const isActive = layer.id === state.activeLayerId
+
+            return (
+              <div
+                key={layer.id}
+                className="absolute left-0 top-0 w-full px-0"
+                style={{
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <LayerRow
+                  layer={layer}
+                  isActive={isActive}
+                  renaming={renaming === layer.id}
+                  renameVal={renameVal}
+                  onSelect={() =>
+                    dispatch({ type: 'SET_ACTIVE_LAYER', id: layer.id })
+                  }
+                  onStartRename={() => startRename(layer.id, layer.name)}
+                  onRenameChange={setRenameVal}
+                  onCommitRename={commitRename}
+                  onToggleVisible={() =>
+                    dispatch({
+                      type: 'UPDATE_LAYER',
+                      id: layer.id,
+                      patch: { visible: !layer.visible },
+                    })
+                  }
+                  onToggleLocked={() =>
+                    dispatch({
+                      type: 'UPDATE_LAYER',
+                      id: layer.id,
+                      patch: { locked: !layer.locked },
+                    })
+                  }
                   onDragStart={() => {
                     dragIdx.current = realIdx
                   }}
@@ -100,96 +107,11 @@ export function LayersPanel() {
                     }
                     dragIdx.current = null
                   }}
-                  className={cn(
-                    'group interactive flex cursor-pointer items-center gap-0.5 rounded px-1 py-0.5',
-                    isActive
-                      ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-500/40'
-                      : 'hover:bg-zinc-800',
-                  )}
-                  onClick={() =>
-                    dispatch({ type: 'SET_ACTIVE_LAYER', id: layer.id })
-                  }
-                  onDoubleClick={() => startRename(layer.id, layer.name)}
-                >
-                  <ToolTooltip
-                    label={layer.visible ? 'Hide layer' : 'Show layer'}
-                    description={
-                      layer.visible
-                        ? 'Layer will not be drawn on the canvas but stays in the list.'
-                        : 'Shows the layer on the canvas again.'
-                    }
-                    side="left"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 opacity-60 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        dispatch({
-                          type: 'UPDATE_LAYER',
-                          id: layer.id,
-                          patch: { visible: !layer.visible },
-                        })
-                      }}
-                    >
-                      {layer.visible ? (
-                        <Eye className="h-3.5 w-3.5" />
-                      ) : (
-                        <EyeOff className="h-3.5 w-3.5 text-zinc-500" />
-                      )}
-                    </Button>
-                  </ToolTooltip>
-                  <ToolTooltip
-                    label={layer.locked ? 'Unlock layer' : 'Lock layer'}
-                    description={
-                      layer.locked
-                        ? 'Allows editing and painting on this layer.'
-                        : 'Prevents painting and edits on this layer.'
-                    }
-                    side="left"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 opacity-60 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        dispatch({
-                          type: 'UPDATE_LAYER',
-                          id: layer.id,
-                          patch: { locked: !layer.locked },
-                        })
-                      }}
-                    >
-                      {layer.locked ? (
-                        <Lock className="h-3.5 w-3.5 text-amber-400/80" />
-                      ) : (
-                        <Unlock className="h-3.5 w-3.5 text-zinc-500" />
-                      )}
-                    </Button>
-                  </ToolTooltip>
-                  <LayerThumb canvas={layer.canvas} />
-                  {renaming === layer.id ? (
-                    <Input
-                      className="h-7 flex-1 text-ui-xs"
-                      value={renameVal}
-                      autoFocus
-                      onChange={(e) => setRenameVal(e.target.value)}
-                      onBlur={commitRename}
-                      onKeyDown={(e) => e.key === 'Enter' && commitRename()}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <span className="flex-1 truncate text-ui-xs text-zinc-300">
-                      {layer.name}
-                    </span>
-                  )}
-                </motion.div>
-              )
-            })}
-          </AnimatePresence>
-        </motion.div>
+                />
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div className="flex gap-0.5 border-t border-zinc-800 px-1 py-1">
@@ -233,7 +155,6 @@ export function LayersPanel() {
           </ToolTooltip>
         ))}
       </div>
-
     </div>
   )
 }
