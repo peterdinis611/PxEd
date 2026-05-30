@@ -12,6 +12,7 @@ export function StatusPageLayout({
   primaryAction,
   secondaryAction,
   className,
+  contentClassName,
 }: {
   badge?: React.ReactNode
   title: string
@@ -20,6 +21,8 @@ export function StatusPageLayout({
   primaryAction?: { label: string; onClick?: () => void; to?: string }
   secondaryAction?: { label: string; onClick?: () => void; to?: string }
   className?: string
+  /** Wider inner column (e.g. error details). */
+  contentClassName?: string
 }) {
   return (
     <div
@@ -40,7 +43,10 @@ export function StatusPageLayout({
       </motion.div>
 
       <motion.div
-        className="relative z-10 flex w-full max-w-md flex-col items-center text-center"
+        className={cn(
+          'relative z-10 flex w-full flex-col items-center text-center',
+          contentClassName ?? 'max-w-md',
+        )}
         variants={staggerContainer}
         initial="initial"
         animate="animate"

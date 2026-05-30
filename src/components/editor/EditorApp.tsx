@@ -5,6 +5,7 @@ import { MenuBar } from '@/components/editor/MenuBar'
 import { ToolsPanel } from '@/components/editor/ToolsPanel'
 import { OptionsBar } from '@/components/editor/OptionsBar'
 import { CanvasArea } from '@/components/editor/CanvasArea'
+import { DraftRestoreBanner } from '@/components/editor/DraftRestoreBanner'
 import { LayersPanel } from '@/components/editor/LayersPanel'
 import { LayerProperties } from '@/components/editor/LayerProperties'
 import { PropertiesPanel } from '@/components/editor/PropertiesPanel'
@@ -114,6 +115,7 @@ function EditorShell() {
         style={{ gridArea: 'canvas' }}
         className="relative min-h-0 min-w-0 overflow-hidden"
       >
+        <DraftRestoreBanner />
         <CanvasArea
           spacePan={spacePan}
           onCursorMove={(x, y, rgba) => setCursor({ x, y, rgba })}

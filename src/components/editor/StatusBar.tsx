@@ -26,7 +26,19 @@ export function StatusBar({
   cursor: { x: number; y: number; rgba: string }
   spacePan?: boolean
 }) {
-  const { state, activeLayer } = useEditor()
+  const { state, activeLayer, draftCache } = useEditor()
+
+  const draftLabel =
+    draftCache.status === 'saving'
+      ? 'Saving draft…'
+      : draftCache.status === 'saved' && draftCache.lastSavedAt
+        ? `Draft saved ${new Date(draftCache.lastSavedAt).toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}`
+        : draftCache.status === 'error'
+          ? 'Draft save failed'
+          : null
 
   return (
     <footer className="chrome-bar flex h-full w-full items-center gap-3 px-3 text-ui-xs">
@@ -48,6 +60,24 @@ export function StatusBar({
       <StatusItem label="Color">
         <span className="max-w-[180px] truncate">{cursor.rgba}</span>
       </StatusItem>
+
+      <AnimatePresence>
+        {draftLabel && draftCache.storageAvailable && (
+          <motion.span
+            key={draftLabel}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className={
+              draftCache.status === 'error'
+                ? 'rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] text-red-400'
+                : 'rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500'
+            }
+          >
+            {draftLabel}
+          </motion.span>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {spacePan && (

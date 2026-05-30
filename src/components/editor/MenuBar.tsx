@@ -119,6 +119,7 @@ export function MenuBar({
     addLayer,
     rotateActiveLayer,
     bakeActiveLayerRotation,
+    draftCache,
   } = useEditor()
   const fileRef = useRef<HTMLInputElement>(null)
   const openRef = useRef<HTMLInputElement>(null)
@@ -260,6 +261,13 @@ export function MenuBar({
             type: 'item',
             label: 'Open Project (JSON)...',
             action: () => fileRef.current?.click(),
+          },
+          { type: 'separator' },
+          {
+            type: 'item',
+            label: 'Clear Autosaved Draft',
+            action: () => void draftCache.clearDraftCache(),
+            disabled: !draftCache.storageAvailable,
           },
         ],
       },
@@ -632,6 +640,7 @@ export function MenuBar({
                 activeLayerId: layer.id,
               },
             })
+            void draftCache.clearDraftCache()
           }
           img.src = URL.createObjectURL(file)
           e.target.value = ''
@@ -650,6 +659,7 @@ export function MenuBar({
           const data = parseProjectJson(text)
           const proj = restoreProject(data)
           dispatch({ type: 'LOAD_PROJECT', state: proj })
+          void draftCache.clearDraftCache()
           e.target.value = ''
         }}
       />
@@ -697,6 +707,7 @@ export function MenuBar({
             className="mt-4"
             onClick={() => {
               dispatch({ type: 'NEW_DOCUMENT', width: newW, height: newH, bg: newBg })
+              void draftCache.clearDraftCache()
               setNewOpen(false)
             }}
           >

@@ -1,20 +1,33 @@
 import { motion } from 'framer-motion'
 import { AlertTriangle } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { ErrorDetailsPanel } from '@/components/pages/ErrorDetailsPanel'
 import { StatusIconRing, StatusPageLayout } from '@/components/pages/StatusPageLayout'
+import { buildErrorContext, type ErrorContext } from '@/lib/errorReport'
 
 export function ErrorPage({
   title = 'Something went wrong',
   description = 'An unexpected error occurred. You can try again or return to the editor.',
   error,
+  componentStack,
+  context,
   onRetry,
 }: {
   title?: string
   description?: string
   error?: Error | null
+  componentStack?: string | null
+  context?: ErrorContext
   onRetry?: () => void
 }) {
+  const location = useLocation()
+  const resolvedContext =
+    context ?? buildErrorContext(location.pathname + location.search)
+
   return (
     <StatusPageLayout
+      className="py-10"
+      contentClassName="max-w-2xl"
       badge={
         <motion.div
           animate={{ x: [0, -2, 2, -1, 1, 0] }}
@@ -39,20 +52,44 @@ export function ErrorPage({
       }
       secondaryAction={{ label: 'Reload page', onClick: () => window.location.reload() }}
     >
-      {error?.message && (
-        <motion.details
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          transition={{ delay: 0.25, duration: 0.3 }}
-          className="mx-auto max-w-sm rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-left"
+      {error ? (
+        <ErrorDetailsPanel
+          report={{ error, componentStack, context: resolvedContext }}
+          context={resolvedContext}
+        />
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mx-auto w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-left"
         >
-          <summary className="cursor-pointer text-ui-xs font-medium text-red-300/90">
-            Error details
-          </summary>
-          <pre className="mt-2 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-zinc-500">
-            {error.message}
-          </pre>
-        </motion.details>
+          <p className="text-ui-xs leading-relaxed text-zinc-500">
+            No error object was attached. If this keeps happening, reload the page or
+            check your network connection.
+          </p>
+          <dl className="mt-3 space-y-2 border-t border-zinc-800 pt-3">
+            {resolvedContext.route && (
+              <>
+                <dt className="text-[10px] uppercase tracking-wide text-zinc-600">
+                  Route
+                </dt>
+                <dd className="font-mono text-[11px] text-zinc-400">
+                  {resolvedContext.route}
+                </dd>
+              </>
+            )}
+            {resolvedContext.timestamp && (
+              <>
+                <dt className="text-[10px] uppercase tracking-wide text-zinc-600">
+                  Time
+                </dt>
+                <dd className="font-mono text-[11px] text-zinc-400">
+                  {resolvedContext.timestamp}
+                </dd>
+              </>
+            )}
+          </dl>
+        </motion.div>
       )}
     </StatusPageLayout>
   )

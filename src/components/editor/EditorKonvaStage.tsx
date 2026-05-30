@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { Image as KonvaImage, Layer, Rect, Stage } from 'react-konva'
 import type Konva from 'konva'
-import { drawCheckerboard } from '@/lib/canvas/composite'
+import { getCheckerboardCanvas } from '@/lib/cache/checkerboardCache'
 import { getViewportLayout } from '@/lib/canvas/viewport'
 import { BLEND_MODE_MAP } from '@/types/editor'
 import type { Layer as EditorLayer } from '@/types/editor'
@@ -33,8 +33,6 @@ export function EditorKonvaStage({
   onLayout: (layout: ReturnType<typeof getViewportLayout>) => void
   stageRef: React.RefObject<Konva.Stage | null>
 }) {
-  const [checkerboard, setCheckerboard] = useState<HTMLCanvasElement | null>(null)
-
   const layout = useMemo(
     () =>
       getViewportLayout(viewportW, viewportH, docWidth, docHeight, zoom, panX, panY, 0),
@@ -43,18 +41,14 @@ export function EditorKonvaStage({
 
   const { scale, offsetX, offsetY, canvasW, canvasH } = layout
 
+  const checkerboard = useMemo(
+    () => (canvasW >= 1 && canvasH >= 1 ? getCheckerboardCanvas(canvasW, canvasH) : null),
+    [canvasW, canvasH],
+  )
+
   useLayoutEffect(() => {
     onLayout(layout)
   }, [layout, onLayout])
-
-  useEffect(() => {
-    const c = document.createElement('canvas')
-    c.width = Math.max(1, canvasW)
-    c.height = Math.max(1, canvasH)
-    const ctx = c.getContext('2d')
-    if (ctx) drawCheckerboard(ctx, c.width, c.height)
-    setCheckerboard(c)
-  }, [canvasW, canvasH])
 
   useEffect(() => {
     const stage = stageRef.current

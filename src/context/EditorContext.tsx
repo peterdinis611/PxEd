@@ -6,6 +6,8 @@ import {
   useReducer,
   type ReactNode,
 } from 'react'
+import { useEditorDraftCache, type DraftCacheStatus } from '@/hooks/useEditorDraftCache'
+import type { EditorDraftCache } from '@/lib/cache/draftStorage'
 import { createLayer, cloneLayer, snapshotLayer, restoreLayerFromSnapshot, renderTextLayer } from '@/lib/canvas/layers'
 import { canRotateLayer } from '@/lib/canvas/layerBounds'
 import { bakeLayerRotation, normalizeAngle, rotateLayerBy } from '@/lib/canvas/transform'
@@ -106,6 +108,17 @@ type Action =
   | { type: 'ADD_RECENT_COLOR'; color: string }
   | { type: 'BUMP_RENDER' }
   | { type: 'LOAD_PROJECT'; state: Pick<EditorState, 'layers' | 'canvasWidth' | 'canvasHeight' | 'activeLayerId'> }
+  | {
+      type: 'RESTORE_DRAFT'
+      layers: Layer[]
+      canvasWidth: number
+      canvasHeight: number
+      canvasBackground: string
+      activeLayerId: string | null
+      tool: ToolName
+      foregroundColor: string
+      backgroundColor: string
+    }
   | { type: 'REQUEST_FIT_TO_SCREEN' }
 
 function pushHistory(state: EditorState, description: string): EditorState {
@@ -349,6 +362,31 @@ function reducer(state: EditorState, action: Action): EditorState {
         historyIndex: 0,
         renderTick: state.renderTick + 1,
       }
+    case 'RESTORE_DRAFT': {
+      const entry: HistoryEntry = {
+        layers: action.layers.map(snapshotLayer),
+        canvasWidth: action.canvasWidth,
+        canvasHeight: action.canvasHeight,
+        description: 'Restored Draft',
+        selection: null,
+      }
+      return {
+        ...state,
+        layers: action.layers,
+        canvasWidth: action.canvasWidth,
+        canvasHeight: action.canvasHeight,
+        canvasBackground: action.canvasBackground,
+        activeLayerId: action.activeLayerId,
+        tool: action.tool,
+        foregroundColor: action.foregroundColor,
+        backgroundColor: action.backgroundColor,
+        selection: null,
+        history: [entry],
+        historyIndex: 0,
+        renderTick: state.renderTick + 1,
+        fitRequest: state.fitRequest + 1,
+      }
+    }
     default:
       return state
   }
@@ -425,12 +463,69 @@ interface EditorContextValue {
   rotateActiveLayer: (deltaDegrees: number) => void
   setActiveLayerRotation: (degrees: number) => void
   bakeActiveLayerRotation: () => void
+  draftCache: {
+    status: DraftCacheStatus
+    lastSavedAt: number | null
+    pendingDraft: EditorDraftCache | null
+    storageAvailable: boolean
+    restoreDraft: () => Promise<void>
+    discardDraft: () => Promise<void>
+    clearDraftCache: () => Promise<void>
+  }
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null)
 
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialState)
+
+  const onRestoreDraft = useCallback(
+    (draft: EditorDraftCache, layers: Layer[]) => {
+      dispatch({
+        type: 'RESTORE_DRAFT',
+        layers,
+        canvasWidth: draft.canvasWidth,
+        canvasHeight: draft.canvasHeight,
+        canvasBackground: draft.canvasBackground,
+        activeLayerId: draft.activeLayerId,
+        tool: draft.tool,
+        foregroundColor: draft.foregroundColor,
+        backgroundColor: draft.backgroundColor,
+      })
+    },
+    [dispatch],
+  )
+
+  const {
+    status: draftStatus,
+    lastSavedAt,
+    pendingDraft,
+    storageAvailable,
+    restoreDraft,
+    discardDraft,
+    clearDraftCache,
+  } = useEditorDraftCache(state, onRestoreDraft)
+
+  const draftCache = useMemo(
+    () => ({
+      status: draftStatus,
+      lastSavedAt,
+      pendingDraft,
+      storageAvailable,
+      restoreDraft,
+      discardDraft,
+      clearDraftCache,
+    }),
+    [
+      draftStatus,
+      lastSavedAt,
+      pendingDraft,
+      storageAvailable,
+      restoreDraft,
+      discardDraft,
+      clearDraftCache,
+    ],
+  )
 
   const activeLayer = useMemo(
     () => state.layers.find((l) => l.id === state.activeLayerId),
@@ -553,6 +648,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       rotateActiveLayer,
       setActiveLayerRotation,
       bakeActiveLayerRotation,
+      draftCache,
     }),
     [
       state,
@@ -563,6 +659,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       rotateActiveLayer,
       setActiveLayerRotation,
       bakeActiveLayerRotation,
+      draftCache,
     ],
   )
 
