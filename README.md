@@ -43,3 +43,8 @@ Open the URL shown in the terminal (usually http://localhost:5173).
 | `bun run build`| Production build         |
 | `bun run lint` | ESLint                   |
 | `bun run preview` | Preview production build |
+| `bun run test` | Run tests in watch mode |
+| `bun run test:run` | Run tests once |
+| `bun run test:coverage` | Run tests with coverage report |
+
+Tests live in the top-level [`tests/`](tests/) directory (mirrors `src/` layout). Shared helpers: `tests/helpers.ts`.

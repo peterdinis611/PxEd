@@ -675,3 +675,5 @@ export function useEditor() {
 }
 
 export type { BlendMode, ToolName, Layer, Selection }
+export type { Action as EditorAction }
+export { reducer as editorReducer, createInitialState as createInitialEditorState }
