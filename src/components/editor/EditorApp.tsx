@@ -8,6 +8,7 @@ import { OptionsBar } from "@/components/editor/OptionsBar";
 import { PropertiesPanel } from "@/components/editor/PropertiesPanel";
 import { StatusBar } from "@/components/editor/StatusBar";
 import { ToolsPanel } from "@/components/editor/ToolsPanel";
+import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEditor } from "@/context/EditorContext";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -150,6 +151,7 @@ function EditorApp() {
 	return (
 		<TooltipProvider delayDuration={300}>
 			<EditorShell />
+			<Toaster />
 		</TooltipProvider>
 	);
 }

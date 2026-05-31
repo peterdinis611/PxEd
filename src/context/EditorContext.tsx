@@ -526,7 +526,7 @@ interface EditorContextValue {
 		storageAvailable: boolean;
 		restoreDraft: () => Promise<void>;
 		discardDraft: () => Promise<void>;
-		clearDraftCache: () => Promise<void>;
+		clearDraftCache: (options?: { silent?: boolean }) => Promise<void>;
 	};
 }
 

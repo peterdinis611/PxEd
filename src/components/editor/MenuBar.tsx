@@ -28,6 +28,7 @@ import {
 	parseProjectJson,
 	restoreProject,
 } from "@/lib/canvas/export";
+import { toast } from "@/lib/toast";
 import {
 	addNoise,
 	emboss,
@@ -261,12 +262,18 @@ export function MenuBar({
 				{
 					type: "item",
 					label: "Save as PNG",
-					action: () =>
-						exportFlattenedPng(
-							state.layers,
-							state.canvasWidth,
-							state.canvasHeight,
-						),
+					action: () => {
+						try {
+							exportFlattenedPng(
+								state.layers,
+								state.canvasWidth,
+								state.canvasHeight,
+							);
+							toast.exportSaved("image.png");
+						} catch {
+							toast.error("PNG export failed");
+						}
+					},
 				},
 				{
 					type: "item",
@@ -277,13 +284,19 @@ export function MenuBar({
 				{
 					type: "item",
 					label: "Export Project (JSON)...",
-					action: () =>
-						exportProjectJson(
-							state.layers,
-							state.canvasWidth,
-							state.canvasHeight,
-							state.activeLayerId,
-						),
+					action: () => {
+						try {
+							exportProjectJson(
+								state.layers,
+								state.canvasWidth,
+								state.canvasHeight,
+								state.activeLayerId,
+							);
+							toast.exportSaved("project.pxed.json");
+						} catch {
+							toast.error("Project export failed");
+						}
+					},
 				},
 				{
 					type: "item",
@@ -840,7 +853,11 @@ export function MenuBar({
 								activeLayerId: layer.id,
 							},
 						});
-						void draftCache.clearDraftCache();
+						void draftCache.clearDraftCache({ silent: true });
+						toast.success("Image opened", file.name);
+					};
+					img.onerror = () => {
+						toast.error("Could not open image", file.name);
 					};
 					img.src = URL.createObjectURL(file);
 					e.target.value = "";
@@ -855,11 +872,16 @@ export function MenuBar({
 				onChange={async (e) => {
 					const file = e.target.files?.[0];
 					if (!file) return;
-					const text = await file.text();
-					const data = parseProjectJson(text);
-					const proj = restoreProject(data);
-					dispatch({ type: "LOAD_PROJECT", state: proj });
-					void draftCache.clearDraftCache();
+					try {
+						const text = await file.text();
+						const data = parseProjectJson(text);
+						const proj = restoreProject(data);
+						dispatch({ type: "LOAD_PROJECT", state: proj });
+						void draftCache.clearDraftCache({ silent: true });
+						toast.success("Project opened", file.name);
+					} catch {
+						toast.error("Could not open project", file.name);
+					}
 					e.target.value = "";
 				}}
 			/>
@@ -924,8 +946,9 @@ export function MenuBar({
 								height: newH,
 								bg: newBg,
 							});
-							void draftCache.clearDraftCache();
+							void draftCache.clearDraftCache({ silent: true });
 							setNewOpen(false);
+							toast.success("New document created", `${newW}×${newH}`);
 						}}
 					>
 						Create
@@ -947,13 +970,18 @@ export function MenuBar({
 					/>
 					<Button
 						onClick={() => {
-							exportJpeg(
-								state.layers,
-								state.canvasWidth,
-								state.canvasHeight,
-								jpegQ,
-							);
-							setJpegOpen(false);
+							try {
+								exportJpeg(
+									state.layers,
+									state.canvasWidth,
+									state.canvasHeight,
+									jpegQ,
+								);
+								toast.exportSaved("image.jpg");
+								setJpegOpen(false);
+							} catch {
+								toast.error("JPEG export failed");
+							}
 						}}
 					>
 						Export

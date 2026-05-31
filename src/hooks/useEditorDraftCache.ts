@@ -12,6 +12,7 @@ import {
 	loadEditorDraft,
 	saveEditorDraft,
 } from "@/lib/cache/draftStorage";
+import { toast } from "@/lib/toast";
 import type { Layer } from "@/types/editor";
 
 const AUTOSAVE_MS = 2000;
@@ -76,6 +77,7 @@ export function useEditorDraftCache(
 			void (async () => {
 				try {
 					setStatus("saving");
+					toast.draftSaving();
 					const draft = buildEditorDraft(state);
 					if (!draftHasMeaningfulContent(draft)) {
 						await clearEditorDraft();
@@ -88,8 +90,13 @@ export function useEditorDraftCache(
 					lastFingerprint.current = fingerprint;
 					setLastSavedAt(draft.savedAt);
 					setStatus("saved");
+					toast.draftSaved();
 				} catch {
 					setStatus("error");
+					toast.error(
+						"Draft save failed",
+						"Your work may not be autosaved locally",
+					);
 				}
 			})();
 		}, AUTOSAVE_MS);
@@ -112,8 +119,10 @@ export function useEditorDraftCache(
 			onRestore(draft, layers);
 			setPendingDraft(null);
 			lastFingerprint.current = `${layers.length}:${draft.canvasWidth}x${draft.canvasHeight}:${draft.activeLayerId}`;
+			toast.success("Draft restored");
 		} catch {
 			setStatus("error");
+			toast.error("Could not restore draft");
 		}
 	}, [pendingDraft, onRestore]);
 
@@ -124,23 +133,34 @@ export function useEditorDraftCache(
 			await clearEditorDraft();
 			setLastSavedAt(null);
 			setStatus("idle");
+			toast.success("Autosaved draft discarded");
 		} catch {
 			setStatus("error");
+			toast.error("Could not discard draft");
 		}
 	}, []);
 
-	const clearDraftCache = useCallback(async () => {
-		skipNextSave.current = true;
-		setPendingDraft(null);
-		try {
-			await clearEditorDraft();
-			setLastSavedAt(null);
-			setStatus("idle");
-			lastFingerprint.current = fingerprint;
-		} catch {
-			setStatus("error");
-		}
-	}, [fingerprint]);
+	const clearDraftCache = useCallback(
+		async (options?: { silent?: boolean }) => {
+			skipNextSave.current = true;
+			setPendingDraft(null);
+			try {
+				await clearEditorDraft();
+				setLastSavedAt(null);
+				setStatus("idle");
+				lastFingerprint.current = fingerprint;
+				if (!options?.silent) {
+					toast.success("Autosaved draft cleared");
+				}
+			} catch {
+				setStatus("error");
+				if (!options?.silent) {
+					toast.error("Could not clear autosaved draft");
+				}
+			}
+		},
+		[fingerprint],
+	);
 
 	return {
 		status,
