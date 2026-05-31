@@ -232,7 +232,10 @@ function ToolButton({
 					"interactive relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded",
 					active ? "text-blue-400" : "text-zinc-400 hover:text-zinc-200",
 				)}
-				onClick={onSelect}
+				onPointerDown={(e) => {
+					e.preventDefault();
+					onSelect();
+				}}
 			>
 				{active && (
 					<motion.span

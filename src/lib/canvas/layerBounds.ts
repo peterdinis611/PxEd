@@ -84,7 +84,7 @@ export function pointInLayerBounds(
 		px >= layer.canvas.width ||
 		py >= layer.canvas.height
 	) {
-		return true;
+		return false;
 	}
 	const a = layer.canvas.getContext("2d")!.getImageData(px, py, 1, 1).data[3]!;
 	return a > 8;

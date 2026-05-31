@@ -108,6 +108,14 @@ export function CanvasArea({
 		startAngle: number;
 		startRotation: number;
 	} | null>(null);
+	const pendingMoveRef = useRef<{
+		layerId: string;
+		startX: number;
+		startY: number;
+		layerOffset: { x: number; y: number };
+	} | null>(null);
+
+	const MOVE_DRAG_THRESHOLD_DOC = 3;
 
 	const showZoomHint = useCallback((zoom: number) => {
 		setZoomHint(zoom);
@@ -324,6 +332,9 @@ export function CanvasArea({
 		}
 
 		if (tool === "move") {
+			e.preventDefault();
+			pendingMoveRef.current = null;
+
 			const hit = findLayerAtPoint(
 				state.layers,
 				x,
@@ -355,13 +366,10 @@ export function CanvasArea({
 				return;
 			}
 
-			dragRef.current = {
-				type: "move",
+			pendingMoveRef.current = {
+				layerId: moveLayer.id,
 				startX: x,
 				startY: y,
-				lastX: x,
-				lastY: y,
-				layerId: moveLayer.id,
 				layerOffset: { x: moveLayer.x, y: moveLayer.y },
 			};
 			return;
@@ -454,6 +462,23 @@ export function CanvasArea({
 			return;
 		}
 
+		if (pendingMoveRef.current && !dragRef.current) {
+			const pending = pendingMoveRef.current;
+			const threshold = MOVE_DRAG_THRESHOLD_DOC / layoutRef.current.scale;
+			if (Math.hypot(x - pending.startX, y - pending.startY) >= threshold) {
+				dragRef.current = {
+					type: "move",
+					startX: pending.startX,
+					startY: pending.startY,
+					lastX: x,
+					lastY: y,
+					layerId: pending.layerId,
+					layerOffset: pending.layerOffset,
+				};
+				pendingMoveRef.current = null;
+			}
+		}
+
 		const drag = dragRef.current;
 		if (!drag) {
 			if (state.tool === "polygon-lasso" && polygonRef.current) {
@@ -539,6 +564,12 @@ export function CanvasArea({
 		if (rotateDragRef.current) {
 			if (activeLayer) commitHistory("Rotate Layer");
 			rotateDragRef.current = null;
+			pendingMoveRef.current = null;
+			return;
+		}
+
+		if (pendingMoveRef.current) {
+			pendingMoveRef.current = null;
 			return;
 		}
 
@@ -547,7 +578,10 @@ export function CanvasArea({
 		dragRef.current = null;
 
 		if (drag.type === "move") {
-			commitHistory("Move Layer");
+			const moved =
+				Math.hypot(drag.lastX - drag.startX, drag.lastY - drag.startY) >=
+				MOVE_DRAG_THRESHOLD_DOC / layoutRef.current.scale;
+			if (moved) commitHistory("Move Layer");
 			return;
 		}
 

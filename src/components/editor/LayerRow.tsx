@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Lock, Unlock } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type DragEvent } from "react";
 import { ToolTooltip } from "@/components/editor/ToolTooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,10 +54,26 @@ export function LayerRow({
 	onDragOver: (e: React.DragEvent) => void;
 	onDrop: () => void;
 }) {
+	const didDrag = useRef(false);
+
+	const handleDragStart = (e: DragEvent) => {
+		didDrag.current = true;
+		onDragStart();
+		e.dataTransfer.effectAllowed = "move";
+	};
+
+	const handleClick = () => {
+		if (didDrag.current) {
+			didDrag.current = false;
+			return;
+		}
+		onSelect();
+	};
+
 	return (
 		<div
 			draggable
-			onDragStart={onDragStart}
+			onDragStart={handleDragStart}
 			onDragOver={onDragOver}
 			onDrop={onDrop}
 			className={cn(
@@ -66,7 +82,7 @@ export function LayerRow({
 					? "bg-blue-500/10 ring-1 ring-inset ring-blue-500/40"
 					: "hover:bg-zinc-800",
 			)}
-			onClick={onSelect}
+			onClick={handleClick}
 			onDoubleClick={onStartRename}
 		>
 			<ToolTooltip

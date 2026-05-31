@@ -58,6 +58,17 @@ describe("pointInLayerBounds", () => {
 		const layer = createFilledLayer(100, 100);
 		expect(pointInLayerBounds(layer, 2, 2)).toBe(false);
 	});
+
+	it("returns false in empty bounding-box padding on rotated layers", () => {
+		const layer = createFilledLayer(40, 40);
+		layer.x = 100;
+		layer.y = 100;
+		layer.rotation = 45;
+		const center = { x: layer.x + 20, y: layer.y + 20 };
+		const corner = { x: layer.x - 5, y: layer.y - 5 };
+		expect(pointInLayerBounds(layer, center.x, center.y)).toBe(true);
+		expect(pointInLayerBounds(layer, corner.x, corner.y)).toBe(false);
+	});
 });
 
 describe("findLayerAtPoint", () => {
