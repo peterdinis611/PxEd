@@ -64,20 +64,59 @@ export function installCanvasPolyfill(): void {
 		const el = this as HTMLCanvasElement;
 		let fillStyle = "#000000";
 
+		let translateX = 0;
+		let translateY = 0;
+		let globalAlpha = 1;
+		const stateStack: {
+			translateX: number;
+			translateY: number;
+			globalAlpha: number;
+			fillStyle: string;
+		}[] = [];
+
 		const ctx = {
 			canvas: el,
 			fillStyle: "#000000",
+			globalCompositeOperation: "source-over",
 			set fillStyle(value: string) {
 				fillStyle = value;
 			},
 			get fillStyle() {
 				return fillStyle;
 			},
+			get globalAlpha() {
+				return globalAlpha;
+			},
+			set globalAlpha(value: number) {
+				globalAlpha = value;
+			},
+			save() {
+				stateStack.push({
+					translateX,
+					translateY,
+					globalAlpha,
+					fillStyle,
+				});
+			},
+			restore() {
+				const prev = stateStack.pop();
+				if (!prev) return;
+				translateX = prev.translateX;
+				translateY = prev.translateY;
+				globalAlpha = prev.globalAlpha;
+				fillStyle = prev.fillStyle;
+			},
+			translate(dx: number, dy: number) {
+				translateX += dx;
+				translateY += dy;
+			},
+			rotate() {},
 			fillRect(x: number, y: number, w: number, h: number) {
 				const img = ensureSize(el);
 				const [r, g, b, a] = parseColor(fillStyle);
-				const x0 = Math.max(0, Math.floor(x));
-				const y0 = Math.max(0, Math.floor(y));
+				const alpha = Math.round(a * globalAlpha);
+				const x0 = Math.max(0, Math.floor(x + translateX));
+				const y0 = Math.max(0, Math.floor(y + translateY));
 				const x1 = Math.min(img.width, Math.ceil(x + w));
 				const y1 = Math.min(img.height, Math.ceil(y + h));
 				for (let py = y0; py < y1; py++) {
@@ -86,7 +125,7 @@ export function installCanvasPolyfill(): void {
 						img.data[i] = r;
 						img.data[i + 1] = g;
 						img.data[i + 2] = b;
-						img.data[i + 3] = a;
+						img.data[i + 3] = alpha;
 					}
 				}
 			},
@@ -156,21 +195,27 @@ export function installCanvasPolyfill(): void {
 					source instanceof HTMLCanvasElement ? ensureSize(source) : null;
 				if (!from) return;
 				const dest = ensureSize(el);
-				const sw = Math.min(from.width, dest.width - dx);
-				const sh = Math.min(from.height, dest.height - dy);
+				const destX = Math.floor(dx + translateX);
+				const destY = Math.floor(dy + translateY);
+				const sw = Math.min(from.width, dest.width - destX);
+				const sh = Math.min(from.height, dest.height - destY);
 				for (let y = 0; y < sh; y++) {
 					for (let x = 0; x < sw; x++) {
 						const si = (y * from.width + x) * 4;
-						const di = ((dy + y) * dest.width + (dx + x)) * 4;
+						const px = destX + x;
+						const py = destY + y;
+						if (px < 0 || py < 0 || px >= dest.width || py >= dest.height)
+							continue;
+						const di = (py * dest.width + px) * 4;
+						const srcA = (from.data[si + 3]! / 255) * globalAlpha;
+						const outA = Math.round(srcA * 255);
 						dest.data[di] = from.data[si]!;
 						dest.data[di + 1] = from.data[si + 1]!;
 						dest.data[di + 2] = from.data[si + 2]!;
-						dest.data[di + 3] = from.data[si + 3]!;
+						dest.data[di + 3] = outA;
 					}
 				}
 			},
-			translate() {},
-			rotate() {},
 		};
 
 		return ctx as unknown as CanvasRenderingContext2D;

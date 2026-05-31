@@ -4,6 +4,7 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -22,8 +23,16 @@ import {
 import { createLayer, renderTextLayer } from "@/lib/canvas/layers";
 import { normalizeRect } from "@/lib/canvas/selection";
 import { drawArrow } from "@/lib/canvas/shapes";
+import {
+	sampleColorAtDocPoint,
+	sampleRgbaAtDocPoint,
+} from "@/lib/canvas/sampleColor";
 import { snapPoint } from "@/lib/canvas/snap";
-import { computeFitViewport, type ViewportLayout } from "@/lib/canvas/viewport";
+import {
+	computeFitViewport,
+	getViewportLayout,
+	type ViewportLayout,
+} from "@/lib/canvas/viewport";
 import type { Selection } from "@/types/editor";
 import type { ShapeDrawPreview } from "@/types/shapePreview";
 
@@ -67,16 +76,40 @@ export function CanvasArea({
 	} = useEditor();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const stageRef = useRef<Konva.Stage>(null);
-	const [layout, setLayout] = useState<ViewportLayout>({
-		scale: 1,
-		drawW: 800,
-		drawH: 600,
-		offsetX: 0,
-		offsetY: 0,
-		canvasW: 800,
-		canvasH: 600,
-	});
-	const layoutRef = useRef(layout);
+	const [viewport, setViewport] = useState({ w: 0, h: 0 });
+	const layout = useMemo(
+		() =>
+			viewport.w < 1 || viewport.h < 1
+				? {
+						scale: 1,
+						drawW: state.canvasWidth,
+						drawH: state.canvasHeight,
+						offsetX: 0,
+						offsetY: 0,
+						canvasW: state.canvasWidth,
+						canvasH: state.canvasHeight,
+					}
+				: getViewportLayout(
+						viewport.w,
+						viewport.h,
+						state.canvasWidth,
+						state.canvasHeight,
+						state.zoom,
+						state.panX,
+						state.panY,
+						0,
+					),
+		[
+			viewport.w,
+			viewport.h,
+			state.canvasWidth,
+			state.canvasHeight,
+			state.zoom,
+			state.panX,
+			state.panY,
+		],
+	);
+	const layoutRef = useRef<ViewportLayout>(layout);
 	layoutRef.current = layout;
 	const dragRef = useRef<{
 		type: string;
@@ -97,7 +130,6 @@ export function CanvasArea({
 	const [shapeCommitFlash, setShapeCommitFlash] =
 		useState<ShapeDrawPreview | null>(null);
 	const [zoomHint, setZoomHint] = useState<number | null>(null);
-	const [viewport, setViewport] = useState({ w: 0, h: 0 });
 	const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const polygonRef = useRef<{ points: { x: number; y: number }[] } | null>(
 		null,
@@ -184,40 +216,21 @@ export function CanvasArea({
 	const stateRef = useRef(state);
 	stateRef.current = state;
 
-	const handleLayout = useCallback((next: ViewportLayout) => {
-		setLayout(next);
-	}, []);
-
-	const sampleColor = (x: number, y: number) => {
-		const layer = activeLayer;
-		if (!layer) return;
-		const ctx = layer.canvas.getContext("2d")!;
-		const r = Math.floor(state.eyedropperSample / 2);
-		let tr = 0,
-			tg = 0,
-			tb = 0,
-			n = 0;
-		for (let dy = -r; dy <= r; dy++) {
-			for (let dx = -r; dx <= r; dx++) {
-				const px = Math.floor(x) + dx;
-				const py = Math.floor(y) + dy;
-				if (
-					px < 0 ||
-					py < 0 ||
-					px >= layer.canvas.width ||
-					py >= layer.canvas.height
-				)
-					continue;
-				const d = ctx.getImageData(px, py, 1, 1).data;
-				tr += d[0]!;
-				tg += d[1]!;
-				tb += d[2]!;
-				n++;
-			}
-		}
-		if (!n) return;
-		const hex = `#${[tr / n, tg / n, tb / n].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
-		dispatch({ type: "SET_COLORS", fg: hex });
+	const pickColorAtDoc = (x: number, y: number, pickBackground: boolean) => {
+		const hex = sampleColorAtDocPoint(
+			state.layers,
+			state.canvasWidth,
+			state.canvasHeight,
+			state.canvasBackground,
+			x,
+			y,
+			state.eyedropperSample,
+		);
+		if (!hex) return;
+		dispatch({
+			type: "SET_COLORS",
+			...(pickBackground ? { bg: hex } : { fg: hex }),
+		});
 		dispatch({ type: "ADD_RECENT_COLOR", color: hex });
 	};
 
@@ -327,7 +340,8 @@ export function CanvasArea({
 		}
 
 		if (tool === "eyedropper") {
-			sampleColor(x, y);
+			const raw = getDocPoint(e);
+			pickColorAtDoc(raw.x, raw.y, e.altKey);
 			return;
 		}
 
@@ -784,21 +798,15 @@ export function CanvasArea({
 		setShapePreview(null);
 	};
 
-	const sampleRgba = (x: number, y: number): string => {
-		const layer = activeLayer;
-		if (!layer) return "—";
-		const px = Math.floor(x);
-		const py = Math.floor(y);
-		if (
-			px < 0 ||
-			py < 0 ||
-			px >= layer.canvas.width ||
-			py >= layer.canvas.height
-		)
-			return "—";
-		const d = layer.canvas.getContext("2d")!.getImageData(px, py, 1, 1).data;
-		return `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${(d[3]! / 255).toFixed(2)})`;
-	};
+	const sampleRgba = (x: number, y: number): string =>
+		sampleRgbaAtDocPoint(
+			state.layers,
+			state.canvasWidth,
+			state.canvasHeight,
+			state.canvasBackground,
+			x,
+			y,
+		);
 
 	const sel = previewSel ?? state.selection;
 	const { scale: viewScale, offsetX, offsetY, canvasW, canvasH } = layout;
@@ -933,17 +941,14 @@ export function CanvasArea({
 				>
 					<EditorKonvaStage
 						stageRef={stageRef}
+						layout={layout}
 						layers={state.layers}
 						docWidth={state.canvasWidth}
 						docHeight={state.canvasHeight}
 						documentFill={state.canvasBackground}
 						viewportW={viewport.w}
 						viewportH={viewport.h}
-						zoom={state.zoom}
-						panX={state.panX}
-						panY={state.panY}
 						renderTick={state.renderTick}
-						onLayout={handleLayout}
 					/>
 				</div>
 

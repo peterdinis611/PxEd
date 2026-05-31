@@ -564,6 +564,9 @@ export function OptionsBar() {
 
 						{tool === "eyedropper" && (
 							<OptionsStrip>
+								<span className="text-ui-xs text-zinc-500">
+									Click · Alt = BG
+								</span>
 								<span className="text-ui-xs text-zinc-500">Sample</span>
 								{[1, 3, 5].map((n) => (
 									<ToggleBtn

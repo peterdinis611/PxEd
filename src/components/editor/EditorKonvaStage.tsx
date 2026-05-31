@@ -1,23 +1,20 @@
 import type Konva from "konva";
-import { useEffect, useLayoutEffect, useMemo } from "react";
+import { memo, useEffect, useMemo } from "react";
 import { Image as KonvaImage, Layer, Rect, Stage } from "react-konva";
 import { getCheckerboardCanvas } from "@/lib/cache/checkerboardCache";
-import { getViewportLayout } from "@/lib/canvas/viewport";
+import type { ViewportLayout } from "@/lib/canvas/viewport";
 import type { Layer as EditorLayer } from "@/types/editor";
 import { BLEND_MODE_MAP } from "@/types/editor";
 
-export function EditorKonvaStage({
+export const EditorKonvaStage = memo(function EditorKonvaStage({
 	layers,
 	docWidth,
 	docHeight,
 	viewportW,
 	viewportH,
-	zoom,
-	panX,
-	panY,
+	layout,
 	renderTick,
 	documentFill,
-	onLayout,
 	stageRef,
 }: {
 	layers: EditorLayer[];
@@ -25,29 +22,11 @@ export function EditorKonvaStage({
 	docHeight: number;
 	viewportW: number;
 	viewportH: number;
-	zoom: number;
-	panX: number;
-	panY: number;
+	layout: ViewportLayout;
 	renderTick: number;
 	documentFill: string;
-	onLayout: (layout: ReturnType<typeof getViewportLayout>) => void;
 	stageRef: React.RefObject<Konva.Stage | null>;
 }) {
-	const layout = useMemo(
-		() =>
-			getViewportLayout(
-				viewportW,
-				viewportH,
-				docWidth,
-				docHeight,
-				zoom,
-				panX,
-				panY,
-				0,
-			),
-		[viewportW, viewportH, docWidth, docHeight, zoom, panX, panY],
-	);
-
 	const { scale, offsetX, offsetY, canvasW, canvasH } = layout;
 
 	const checkerboard = useMemo(
@@ -58,15 +37,11 @@ export function EditorKonvaStage({
 		[canvasW, canvasH],
 	);
 
-	useLayoutEffect(() => {
-		onLayout(layout);
-	}, [layout, onLayout]);
-
 	useEffect(() => {
 		const stage = stageRef.current;
 		if (!stage) return;
 		stage.getLayers().forEach((layer) => layer.batchDraw());
-	}, [layers, renderTick, stageRef]);
+	}, [renderTick, stageRef]);
 
 	if (viewportW < 1 || viewportH < 1) return null;
 
@@ -125,4 +100,4 @@ export function EditorKonvaStage({
 			</Layer>
 		</Stage>
 	);
-}
+});
