@@ -1,14 +1,14 @@
 export type MenuItem =
-  | { type: 'separator' }
-  | {
-      type: 'item'
-      label: string
-      action: () => void
-      shortcut?: string
-      disabled?: boolean
-    }
+	| { type: "separator" }
+	| {
+			type: "item";
+			label: string;
+			action: () => void;
+			shortcut?: string;
+			disabled?: boolean;
+	  };
 
 export type MenuDefinition = {
-  label: string
-  items: MenuItem[]
-}
+	label: string;
+	items: MenuItem[];
+};
