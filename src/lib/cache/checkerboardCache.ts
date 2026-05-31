@@ -1,28 +1,24 @@
-import { LruCache } from "@/lib/cache/lruCache";
+import { cache } from "react";
 import { drawCheckerboard } from "@/lib/canvas/composite";
 
-const cache = new LruCache<string, HTMLCanvasElement>(12);
-
-export function getCheckerboardCanvas(
+function createCheckerboardCanvas(
 	width: number,
 	height: number,
 ): HTMLCanvasElement {
 	const w = Math.max(1, Math.floor(width));
 	const h = Math.max(1, Math.floor(height));
-	const key = `${w}x${h}`;
-
-	const hit = cache.get(key);
-	if (hit && hit.width === w && hit.height === h) return hit;
-
 	const canvas = document.createElement("canvas");
 	canvas.width = w;
 	canvas.height = h;
 	const ctx = canvas.getContext("2d");
 	if (ctx) drawCheckerboard(ctx, w, h);
-	cache.set(key, canvas);
 	return canvas;
 }
 
+/** Memoized checkerboard tiles (React `cache`, per render tree). */
+export const getCheckerboardCanvas = cache(createCheckerboardCanvas);
+
+/** @deprecated React cache is scoped to the render; nothing to clear on the client. */
 export function clearCheckerboardCache(): void {
-	cache.clear();
+	// Kept for API compatibility — use `unstable_useCacheRefresh` in components if needed.
 }

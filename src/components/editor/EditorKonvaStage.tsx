@@ -1,5 +1,5 @@
 import type Konva from "konva";
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect } from "react";
 import { Image as KonvaImage, Layer, Rect, Stage } from "react-konva";
 import { getCheckerboardCanvas } from "@/lib/cache/checkerboardCache";
 import type { ViewportLayout } from "@/lib/canvas/viewport";
@@ -29,13 +29,8 @@ export const EditorKonvaStage = memo(function EditorKonvaStage({
 }) {
 	const { scale, offsetX, offsetY, canvasW, canvasH } = layout;
 
-	const checkerboard = useMemo(
-		() =>
-			canvasW >= 1 && canvasH >= 1
-				? getCheckerboardCanvas(canvasW, canvasH)
-				: null,
-		[canvasW, canvasH],
-	);
+	const checkerboard =
+		canvasW >= 1 && canvasH >= 1 ? getCheckerboardCanvas(canvasW, canvasH) : null;
 
 	useEffect(() => {
 		const stage = stageRef.current;

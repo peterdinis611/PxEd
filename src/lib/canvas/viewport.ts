@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 export interface ViewportLayout {
 	scale: number;
 	drawW: number;
@@ -8,8 +10,7 @@ export interface ViewportLayout {
 	canvasH: number;
 }
 
-/** zoom 100 = document fitted to fill available viewport (uniform scale). */
-export function getViewportLayout(
+function computeViewportLayout(
 	viewportW: number,
 	viewportH: number,
 	docWidth: number,
@@ -40,6 +41,9 @@ export function getViewportLayout(
 		canvasH,
 	};
 }
+
+/** zoom 100 = document fitted to fill available viewport (uniform scale). */
+export const getViewportLayout = cache(computeViewportLayout);
 
 export function computeFitViewport(): {
 	zoom: number;

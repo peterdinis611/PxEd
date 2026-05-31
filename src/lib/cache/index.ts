@@ -6,6 +6,7 @@ export {
 	clearCheckerboardCache,
 	getCheckerboardCanvas,
 } from "@/lib/cache/checkerboardCache";
+export { cache, cacheSignal, unstable_useCacheRefresh } from "@/lib/cache/reactCache";
 export {
 	type CachedLayerSnapshot,
 	clearEditorDraft,

@@ -4,7 +4,6 @@ import {
 	useCallback,
 	useEffect,
 	useLayoutEffect,
-	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -77,38 +76,27 @@ export function CanvasArea({
 	const containerRef = useRef<HTMLDivElement>(null);
 	const stageRef = useRef<Konva.Stage>(null);
 	const [viewport, setViewport] = useState({ w: 0, h: 0 });
-	const layout = useMemo(
-		() =>
-			viewport.w < 1 || viewport.h < 1
-				? {
-						scale: 1,
-						drawW: state.canvasWidth,
-						drawH: state.canvasHeight,
-						offsetX: 0,
-						offsetY: 0,
-						canvasW: state.canvasWidth,
-						canvasH: state.canvasHeight,
-					}
-				: getViewportLayout(
-						viewport.w,
-						viewport.h,
-						state.canvasWidth,
-						state.canvasHeight,
-						state.zoom,
-						state.panX,
-						state.panY,
-						0,
-					),
-		[
-			viewport.w,
-			viewport.h,
-			state.canvasWidth,
-			state.canvasHeight,
-			state.zoom,
-			state.panX,
-			state.panY,
-		],
-	);
+	const layout: ViewportLayout =
+		viewport.w < 1 || viewport.h < 1
+			? {
+					scale: 1,
+					drawW: state.canvasWidth,
+					drawH: state.canvasHeight,
+					offsetX: 0,
+					offsetY: 0,
+					canvasW: state.canvasWidth,
+					canvasH: state.canvasHeight,
+				}
+			: getViewportLayout(
+					viewport.w,
+					viewport.h,
+					state.canvasWidth,
+					state.canvasHeight,
+					state.zoom,
+					state.panX,
+					state.panY,
+					0,
+				);
 	const layoutRef = useRef<ViewportLayout>(layout);
 	layoutRef.current = layout;
 	const dragRef = useRef<{
