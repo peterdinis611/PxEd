@@ -1,5 +1,6 @@
 import { generateId } from "@/lib/utils";
 import type { BlendMode, Layer, LayerSnapshot, TextData } from "@/types/editor";
+import type { ImageSourceMetadata } from "@/types/imageMetadata";
 
 export function createLayerCanvas(
 	width: number,
@@ -25,6 +26,7 @@ export function createLayer(
 		fill?: string;
 		type?: Layer["type"];
 		textData?: TextData;
+		sourceMetadata?: ImageSourceMetadata;
 	},
 ): Layer {
 	return {
@@ -40,6 +42,7 @@ export function createLayer(
 		rotation: 0,
 		type: options?.type ?? "pixel",
 		textData: options?.textData,
+		sourceMetadata: options?.sourceMetadata,
 	};
 }
 
@@ -53,6 +56,14 @@ export function cloneLayer(layer: Layer): Layer {
 		name: `${layer.name} copy`,
 		canvas,
 		textData: layer.textData ? { ...layer.textData } : undefined,
+		sourceMetadata: layer.sourceMetadata
+			? {
+					...layer.sourceMetadata,
+					exif: layer.sourceMetadata.exif
+						? { ...layer.sourceMetadata.exif }
+						: undefined,
+				}
+			: undefined,
 	};
 }
 
@@ -71,6 +82,14 @@ export function snapshotLayer(layer: Layer): LayerSnapshot {
 		rotation: layer.rotation ?? 0,
 		type: layer.type,
 		textData: layer.textData ? { ...layer.textData } : undefined,
+		sourceMetadata: layer.sourceMetadata
+			? {
+					...layer.sourceMetadata,
+					exif: layer.sourceMetadata.exif
+						? { ...layer.sourceMetadata.exif }
+						: undefined,
+				}
+			: undefined,
 	};
 }
 
@@ -95,6 +114,14 @@ export function restoreLayerFromSnapshot(
 		rotation: snap.rotation ?? 0,
 		type: snap.type,
 		textData: snap.textData ? { ...snap.textData } : undefined,
+		sourceMetadata: snap.sourceMetadata
+			? {
+					...snap.sourceMetadata,
+					exif: snap.sourceMetadata.exif
+						? { ...snap.sourceMetadata.exif }
+						: undefined,
+				}
+			: undefined,
 	};
 }
 

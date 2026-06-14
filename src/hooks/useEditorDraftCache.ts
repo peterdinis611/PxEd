@@ -12,10 +12,12 @@ import {
 	loadEditorDraft,
 	saveEditorDraft,
 } from "@/lib/cache/draftStorage";
+import {
+	getAutosaveDelayMs,
+	shouldSkipAutosave,
+} from "@/lib/canvas/documentLimits";
 import { toast } from "@/lib/toast";
 import type { Layer } from "@/types/editor";
-
-const AUTOSAVE_MS = 2000;
 
 export type DraftCacheStatus =
 	| "idle"
@@ -40,7 +42,18 @@ export function useEditorDraftCache(
 	const hydrated = useRef(false);
 	const skipNextSave = useRef(false);
 
-	const fingerprint = `${state.renderTick ?? 0}:${state.layers.length}:${state.canvasWidth}x${state.canvasHeight}:${state.activeLayerId}`;
+	const skipAutosave = shouldSkipAutosave(
+		state.canvasWidth,
+		state.canvasHeight,
+		state.layers.length,
+	);
+	const autosaveMs = getAutosaveDelayMs(
+		state.canvasWidth,
+		state.canvasHeight,
+		state.layers.length,
+	);
+
+	const fingerprint = `${state.historyIndex}:${state.history.length}:${state.layers.length}:${state.canvasWidth}x${state.canvasHeight}:${state.activeLayerId}:${state.foregroundColor}:${state.backgroundColor}`;
 
 	useEffect(() => {
 		if (!isDraftStorageAvailable()) {
@@ -66,6 +79,10 @@ export function useEditorDraftCache(
 
 	useEffect(() => {
 		if (!isDraftStorageAvailable() || !hydrated.current) return;
+		if (skipAutosave) {
+			setStatus("unavailable");
+			return;
+		}
 		if (skipNextSave.current) {
 			skipNextSave.current = false;
 			return;
@@ -99,12 +116,12 @@ export function useEditorDraftCache(
 					);
 				}
 			})();
-		}, AUTOSAVE_MS);
+		}, autosaveMs);
 
 		return () => {
 			if (saveTimer.current) clearTimeout(saveTimer.current);
 		};
-	}, [state, fingerprint]);
+	}, [state, fingerprint, skipAutosave, autosaveMs]);
 
 	useEffect(() => {
 		hydrated.current = true;
@@ -118,7 +135,7 @@ export function useEditorDraftCache(
 			skipNextSave.current = true;
 			onRestore(draft, layers);
 			setPendingDraft(null);
-			lastFingerprint.current = `${layers.length}:${draft.canvasWidth}x${draft.canvasHeight}:${draft.activeLayerId}`;
+			lastFingerprint.current = `${state.historyIndex}:${state.history.length}:${layers.length}:${draft.canvasWidth}x${draft.canvasHeight}:${draft.activeLayerId}:${draft.foregroundColor}:${draft.backgroundColor}`;
 			toast.success("Draft restored");
 		} catch {
 			setStatus("error");

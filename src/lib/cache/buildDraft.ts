@@ -15,6 +15,8 @@ export interface DraftSourceState {
 	tool: ToolName;
 	foregroundColor: string;
 	backgroundColor: string;
+	historyIndex: number;
+	history: { length: number };
 	renderTick?: number;
 }
 

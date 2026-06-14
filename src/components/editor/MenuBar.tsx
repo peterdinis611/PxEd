@@ -28,6 +28,19 @@ import {
 	parseProjectJson,
 	restoreProject,
 } from "@/lib/canvas/export";
+import {
+	clampDocumentSize,
+	fitWithinDocumentLimits,
+	formatMegapixels,
+	getDocumentProfile,
+} from "@/lib/canvas/documentLimits";
+import {
+	drawImageWithExifOrientation,
+	extractImageMetadata,
+	formatCameraLine,
+	getOrientedDimensions,
+	normalizeExifOrientation,
+} from "@/lib/image/metadata";
 import { toast } from "@/lib/toast";
 import {
 	addNoise,
@@ -838,28 +851,95 @@ export function MenuBar({
 				onChange={(e) => {
 					const file = e.target.files?.[0];
 					if (!file) return;
+					const objectUrl = URL.createObjectURL(file);
 					const img = new Image();
 					img.onload = () => {
-						const w = img.width;
-						const h = img.height;
-						const layer = createLayer(w, h, "Background");
-						layer.canvas.getContext("2d")!.drawImage(img, 0, 0);
-						dispatch({
-							type: "LOAD_PROJECT",
-							state: {
-								layers: [layer],
-								canvasWidth: w,
-								canvasHeight: h,
-								activeLayerId: layer.id,
-							},
-						});
-						void draftCache.clearDraftCache({ silent: true });
-						toast.success("Image opened", file.name);
+						void (async () => {
+							URL.revokeObjectURL(objectUrl);
+							try {
+								const metadata = await extractImageMetadata(file, {
+									width: img.naturalWidth,
+									height: img.naturalHeight,
+								});
+								const orientation = normalizeExifOrientation(
+									metadata.exif?.orientation,
+								);
+								const oriented = getOrientedDimensions(
+									img.naturalWidth,
+									img.naturalHeight,
+									orientation,
+								);
+								const fitted = fitWithinDocumentLimits(
+									oriented.width,
+									oriented.height,
+								);
+								const layer = createLayer(
+									fitted.width,
+									fitted.height,
+									"Background",
+									{
+										sourceMetadata: {
+											...metadata,
+											orientedWidth: fitted.width,
+											orientedHeight: fitted.height,
+										},
+									},
+								);
+								drawImageWithExifOrientation(
+									layer.canvas.getContext("2d")!,
+									img,
+									fitted.width,
+									fitted.height,
+									orientation,
+								);
+								dispatch({
+									type: "LOAD_PROJECT",
+									state: {
+										layers: [layer],
+										canvasWidth: fitted.width,
+										canvasHeight: fitted.height,
+										activeLayerId: layer.id,
+									},
+								});
+								void draftCache.clearDraftCache({ silent: true });
+								const profile = getDocumentProfile(
+									fitted.width,
+									fitted.height,
+									1,
+								);
+								const camera = formatCameraLine(metadata.exif);
+								if (fitted.scaled) {
+									toast.info(
+										"Image scaled to fit limits",
+										`${fitted.width}×${fitted.height} (${formatMegapixels(profile.megapixels)})`,
+									);
+								} else if (camera) {
+									toast.success("Image opened", camera);
+								} else {
+									toast.success("Image opened", file.name);
+								}
+								if (profile.isLarge) {
+									toast.info(
+										"Large document mode",
+										`Undo limited to ${profile.historyLimit} steps`,
+									);
+								}
+								if (!profile.autosaveEnabled) {
+									toast.info(
+										"Autosave disabled",
+										"Document is too large for local draft cache",
+									);
+								}
+							} catch {
+								toast.error("Could not open image", file.name);
+							}
+						})();
 					};
 					img.onerror = () => {
+						URL.revokeObjectURL(objectUrl);
 						toast.error("Could not open image", file.name);
 					};
-					img.src = URL.createObjectURL(file);
+					img.src = objectUrl;
 					e.target.value = "";
 				}}
 			/>
@@ -940,15 +1020,33 @@ export function MenuBar({
 					<Button
 						className="mt-4"
 						onClick={() => {
+							const { width, height, clamped, reason } = clampDocumentSize(
+								newW,
+								newH,
+							);
 							dispatch({
 								type: "NEW_DOCUMENT",
-								width: newW,
-								height: newH,
+								width,
+								height,
 								bg: newBg,
 							});
 							void draftCache.clearDraftCache({ silent: true });
 							setNewOpen(false);
-							toast.success("New document created", `${newW}×${newH}`);
+							const profile = getDocumentProfile(width, height, 1);
+							if (clamped) {
+								toast.info(
+									"Canvas size adjusted",
+									`${width}×${height}${reason ? ` · ${reason}` : ""}`,
+								);
+							} else {
+								toast.success("New document created", `${width}×${height}`);
+							}
+							if (profile.isLarge) {
+								toast.info(
+									"Large document mode",
+									`Undo limited to ${profile.historyLimit} steps`,
+								);
+							}
 						}}
 					>
 						Create
@@ -1015,8 +1113,22 @@ export function MenuBar({
 					<Button
 						className="mt-4"
 						onClick={() => {
-							dispatch({ type: "SET_CANVAS_SIZE", width: cw, height: ch });
+							const { width, height, clamped, reason } = clampDocumentSize(
+								cw,
+								ch,
+							);
+							dispatch({
+								type: "SET_CANVAS_SIZE",
+								width,
+								height,
+							});
 							setCanvasSizeOpen(false);
+							if (clamped) {
+								toast.info(
+									"Canvas size adjusted",
+									`${width}×${height}${reason ? ` · ${reason}` : ""}`,
+								);
+							}
 						}}
 					>
 						Apply

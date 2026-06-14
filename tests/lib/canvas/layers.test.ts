@@ -35,6 +35,30 @@ describe("snapshotLayer / restoreLayerFromSnapshot", () => {
 			.getImageData(30, 30, 1, 1).data;
 		expect(dst[3]).toBe(src[3]);
 	});
+
+	it("round-trips source metadata", () => {
+		const layer = createFilledLayer(32, 32, "Photo");
+		layer.sourceMetadata = {
+			fileName: "test.jpg",
+			fileSize: 1024,
+			mimeType: "image/jpeg",
+			lastModified: 1,
+			importedAt: 2,
+			originalWidth: 32,
+			originalHeight: 32,
+			orientedWidth: 32,
+			orientedHeight: 32,
+			exif: { make: "Canon", model: "EOS", orientation: 1 },
+		};
+
+		const restored = restoreLayerFromSnapshot(
+			snapshotLayer(layer),
+			32,
+			32,
+		);
+		expect(restored.sourceMetadata?.fileName).toBe("test.jpg");
+		expect(restored.sourceMetadata?.exif?.make).toBe("Canon");
+	});
 });
 
 describe("cloneLayer", () => {

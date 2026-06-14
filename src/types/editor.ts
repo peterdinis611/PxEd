@@ -1,3 +1,5 @@
+import type { ImageSourceMetadata } from "@/types/imageMetadata";
+
 export type BlendMode =
 	| "normal"
 	| "multiply"
@@ -60,6 +62,8 @@ export interface Layer {
 	rotation: number;
 	type: "pixel" | "text" | "shape";
 	textData?: TextData;
+	/** Populated when the layer was imported from a raster file. */
+	sourceMetadata?: ImageSourceMetadata;
 }
 
 export interface SelectionRect {
@@ -100,6 +104,7 @@ export interface LayerSnapshot {
 	rotation: number;
 	type: "pixel" | "text" | "shape";
 	textData?: TextData;
+	sourceMetadata?: ImageSourceMetadata;
 }
 
 export interface HistoryEntry {

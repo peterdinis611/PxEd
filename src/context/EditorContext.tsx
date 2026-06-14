@@ -34,9 +34,11 @@ import type {
 	ShapeSettings,
 	ToolName,
 } from "@/types/editor";
+import {
+	clampDocumentSize,
+	getHistoryLimit,
+} from "@/lib/canvas/documentLimits";
 import { DEFAULT_BRUSH, DEFAULT_MARQUEE, DEFAULT_SHAPE } from "@/types/editor";
-
-const MAX_HISTORY = 50;
 
 export interface EditorState {
 	layers: Layer[];
@@ -126,7 +128,12 @@ type Action =
 	| { type: "DUPLICATE_LAYER"; id: string }
 	| { type: "REORDER_LAYERS"; from: number; to: number }
 	| { type: "NEW_DOCUMENT"; width: number; height: number; bg: string }
-	| { type: "SET_CANVAS_SIZE"; width: number; height: number }
+	| {
+			type: "SET_CANVAS_SIZE";
+			width: number;
+			height: number;
+			pushHistory?: boolean;
+	  }
 	| { type: "PUSH_HISTORY"; description: string }
 	| { type: "UNDO" }
 	| { type: "REDO" }
@@ -176,8 +183,13 @@ function pushHistory(state: EditorState, description: string): EditorState {
 	};
 	let history = state.history.slice(0, state.historyIndex + 1);
 	history.push(entry);
-	if (history.length > MAX_HISTORY)
-		history = history.slice(history.length - MAX_HISTORY);
+	const maxHistory = getHistoryLimit(
+		state.canvasWidth,
+		state.canvasHeight,
+		state.layers.length,
+	);
+	if (history.length > maxHistory)
+		history = history.slice(history.length - maxHistory);
 	return {
 		...state,
 		history,
@@ -319,11 +331,15 @@ function reducer(state: EditorState, action: Action): EditorState {
 			return { ...state, layers, renderTick: state.renderTick + 1 };
 		}
 		case "NEW_DOCUMENT": {
-			const layer = createLayer(action.width, action.height, "Layer 1");
+			const { width, height } = clampDocumentSize(
+				action.width,
+				action.height,
+			);
+			const layer = createLayer(width, height, "Layer 1");
 			const entry: HistoryEntry = {
 				layers: [snapshotLayer(layer)],
-				canvasWidth: action.width,
-				canvasHeight: action.height,
+				canvasWidth: width,
+				canvasHeight: height,
 				description: "New Document",
 				selection: null,
 			};
@@ -331,8 +347,8 @@ function reducer(state: EditorState, action: Action): EditorState {
 				...state,
 				layers: [layer],
 				activeLayerId: layer.id,
-				canvasWidth: action.width,
-				canvasHeight: action.height,
+				canvasWidth: width,
+				canvasHeight: height,
 				canvasBackground: action.bg,
 				selection: null,
 				history: [entry],
@@ -345,24 +361,29 @@ function reducer(state: EditorState, action: Action): EditorState {
 			};
 		}
 		case "SET_CANVAS_SIZE": {
+			const { width, height } = clampDocumentSize(
+				action.width,
+				action.height,
+			);
 			const layers = state.layers.map((l) => {
+				if (l.canvas.width === width && l.canvas.height === height) return l;
 				const nc = document.createElement("canvas");
-				nc.width = action.width;
-				nc.height = action.height;
+				nc.width = width;
+				nc.height = height;
 				const ctx = nc.getContext("2d")!;
 				ctx.drawImage(l.canvas, 0, 0);
 				return { ...l, canvas: nc };
 			});
-			return pushHistory(
-				{
-					...state,
-					layers,
-					canvasWidth: action.width,
-					canvasHeight: action.height,
-					fitRequest: state.fitRequest + 1,
-				},
-				"Canvas Size",
-			);
+			const next = {
+				...state,
+				layers,
+				canvasWidth: width,
+				canvasHeight: height,
+				fitRequest: state.fitRequest + 1,
+				renderTick: state.renderTick + 1,
+			};
+			if (action.pushHistory === false) return next;
+			return pushHistory(next, "Canvas Size");
 		}
 		case "PUSH_HISTORY":
 			return pushHistory(state, action.description);

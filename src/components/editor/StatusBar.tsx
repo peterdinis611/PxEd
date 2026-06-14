@@ -1,5 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import {
+	formatMegapixels,
+	getDocumentProfile,
+} from "@/lib/canvas/documentLimits";
 import { useEditor } from "@/context/EditorContext";
 
 function StatusItem({
@@ -27,9 +31,16 @@ export function StatusBar({
 	spacePan?: boolean;
 }) {
 	const { state, activeLayer, draftCache } = useEditor();
+	const profile = getDocumentProfile(
+		state.canvasWidth,
+		state.canvasHeight,
+		state.layers.length,
+	);
 
 	const draftLabel =
-		draftCache.status === "saving"
+		!profile.autosaveEnabled
+			? "Autosave off (large doc)"
+			: draftCache.status === "saving"
 			? "Saving draft…"
 			: draftCache.status === "saved" && draftCache.lastSavedAt
 				? `Draft saved ${new Date(draftCache.lastSavedAt).toLocaleTimeString(
@@ -54,6 +65,12 @@ export function StatusBar({
 			<span className="h-3 w-px bg-zinc-700" />
 			<StatusItem label="Canvas">
 				{state.canvasWidth} × {state.canvasHeight}
+				{profile.isLarge ? (
+					<span className="ml-1 text-amber-500/90">
+						· {formatMegapixels(profile.megapixels)} · undo×
+						{profile.historyLimit}
+					</span>
+				) : null}
 			</StatusItem>
 			<span className="h-3 w-px bg-zinc-700" />
 			<StatusItem label="XY">

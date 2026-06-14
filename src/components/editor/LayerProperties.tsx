@@ -1,4 +1,5 @@
 import { RotateCcw, RotateCw } from "lucide-react";
+import { ImageMetadataPanel } from "@/components/editor/ImageMetadataPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +54,7 @@ export function LayerProperties() {
 	const canRotate = !active.locked && !isBackdrop;
 
 	return (
+		<>
 		<section className="sidebar-section shrink-0 px-2 py-2">
 			<div className="grid grid-cols-[1fr_1fr_auto] items-end gap-x-2 gap-y-2">
 				<div>
@@ -204,5 +206,9 @@ export function LayerProperties() {
 				</Select>
 			</div>
 		</section>
+		{active.sourceMetadata ? (
+			<ImageMetadataPanel metadata={active.sourceMetadata} />
+		) : null}
+		</>
 	);
 }

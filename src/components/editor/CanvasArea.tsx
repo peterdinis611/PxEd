@@ -134,6 +134,32 @@ export function CanvasArea({
 		startY: number;
 		layerOffset: { x: number; y: number };
 	} | null>(null);
+	const renderRafRef = useRef<number | null>(null);
+
+	const scheduleRender = useCallback(() => {
+		if (renderRafRef.current !== null) return;
+		renderRafRef.current = requestAnimationFrame(() => {
+			renderRafRef.current = null;
+			dispatch({ type: "BUMP_RENDER" });
+		});
+	}, [dispatch]);
+
+	const flushRender = useCallback(() => {
+		if (renderRafRef.current !== null) {
+			cancelAnimationFrame(renderRafRef.current);
+			renderRafRef.current = null;
+		}
+		dispatch({ type: "BUMP_RENDER" });
+	}, [dispatch]);
+
+	useEffect(
+		() => () => {
+			if (renderRafRef.current !== null) {
+				cancelAnimationFrame(renderRafRef.current);
+			}
+		},
+		[],
+	);
 
 	const MOVE_DRAG_THRESHOLD_DOC = 3;
 
@@ -537,7 +563,7 @@ export function CanvasArea({
 			drawStroke(ctx, drag.lastX, drag.lastY, x, y, tool === "eraser");
 			drag.lastX = x;
 			drag.lastY = y;
-			dispatch({ type: "BUMP_RENDER" });
+			scheduleRender();
 			return;
 		}
 
@@ -634,7 +660,12 @@ export function CanvasArea({
 					return { ...l, canvas: nc, x: 0, y: 0 };
 				});
 				dispatch({ type: "SET_LAYERS", layers });
-				dispatch({ type: "SET_CANVAS_SIZE", width: nw, height: nh });
+				dispatch({
+					type: "SET_CANVAS_SIZE",
+					width: nw,
+					height: nh,
+					pushHistory: false,
+				});
 				dispatch({ type: "SET_SELECTION", selection: null });
 				commitHistory("Crop");
 			}
@@ -772,6 +803,7 @@ export function CanvasArea({
 				drag.type === "pencil" ||
 				drag.type === "eraser"
 			) {
+				flushRender();
 				commitHistory(
 					drag.type === "eraser"
 						? "Eraser"
