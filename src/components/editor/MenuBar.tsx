@@ -25,6 +25,7 @@ import {
 	exportFlattenedPng,
 	exportJpeg,
 	exportProjectJson,
+	exportWebp,
 	parseProjectJson,
 	restoreProject,
 } from "@/lib/canvas/export";
@@ -50,7 +51,7 @@ import {
 	sharpen,
 } from "@/lib/canvas/filters";
 import { createLayer } from "@/lib/canvas/layers";
-import { drawLayerWithTransform } from "@/lib/canvas/transform";
+import { canInvertSelection } from "@/lib/canvas/selection";
 import type { ToolName } from "@/types/editor";
 
 const SHORTCUT_GROUPS: { title: string; rows: [string, string][] }[] = [
@@ -116,6 +117,7 @@ export interface MenuBarProps {
 	onCopy: () => void;
 	onPaste: () => void;
 	onClear: () => void;
+	onInvertSelection: () => void;
 }
 
 export function MenuBar({
@@ -124,6 +126,7 @@ export function MenuBar({
 	onCopy,
 	onPaste,
 	onClear,
+	onInvertSelection,
 }: MenuBarProps) {
 	const {
 		state,
@@ -144,6 +147,7 @@ export function MenuBar({
 	const [newBg, setNewBg] = useState("#ffffff");
 
 	const [jpegOpen, setJpegOpen] = useState(false);
+	const [webpOpen, setWebpOpen] = useState(false);
 	const [jpegQ, setJpegQ] = useState(90);
 
 	const [filterOpen, setFilterOpen] = useState<string | null>(null);
@@ -281,6 +285,7 @@ export function MenuBar({
 								state.layers,
 								state.canvasWidth,
 								state.canvasHeight,
+								state.canvasBackground,
 							);
 							toast.exportSaved("image.png");
 						} catch {
@@ -292,6 +297,11 @@ export function MenuBar({
 					type: "item",
 					label: "Save as JPEG...",
 					action: () => setJpegOpen(true),
+				},
+				{
+					type: "item",
+					label: "Save as WebP...",
+					action: () => setWebpOpen(true),
 				},
 				{ type: "separator" },
 				{
@@ -429,6 +439,13 @@ export function MenuBar({
 					label: "Deselect",
 					action: onDeselect,
 					shortcut: "Ctrl+D",
+				},
+				{
+					type: "item",
+					label: "Invert Selection",
+					action: onInvertSelection,
+					shortcut: "Ctrl+Shift+I",
+					disabled: !canInvertSelection(state.selection),
 				},
 				{
 					type: "item",
@@ -1074,11 +1091,46 @@ export function MenuBar({
 									state.canvasWidth,
 									state.canvasHeight,
 									jpegQ,
+									state.canvasBackground,
 								);
 								toast.exportSaved("image.jpg");
 								setJpegOpen(false);
 							} catch {
 								toast.error("JPEG export failed");
+							}
+						}}
+					>
+						Export
+					</Button>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={webpOpen} onOpenChange={setWebpOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Export WebP</DialogTitle>
+					</DialogHeader>
+					<Label>Quality: {jpegQ}%</Label>
+					<Slider
+						value={[jpegQ]}
+						min={1}
+						max={100}
+						onValueChange={([v]) => setJpegQ(v!)}
+					/>
+					<Button
+						onClick={() => {
+							try {
+								exportWebp(
+									state.layers,
+									state.canvasWidth,
+									state.canvasHeight,
+									jpegQ,
+									state.canvasBackground,
+								);
+								toast.exportSaved("image.webp");
+								setWebpOpen(false);
+							} catch {
+								toast.error("WebP export failed");
 							}
 						}}
 					>

@@ -136,8 +136,19 @@ export function renderTextLayer(layer: Layer): void {
 	ctx.textAlign = align;
 	ctx.textBaseline = "top";
 	const lines = text.split("\n");
-	const lineHeight = size * 1.2;
+	const lineHeight = size * ((layer.textData.lineHeight ?? 120) / 100);
 	lines.forEach((line, i) => {
-		ctx.fillText(line, x, y + i * lineHeight);
+		const ly = y + i * lineHeight;
+		ctx.fillText(line, x, ly);
+		if (layer.textData?.underline) {
+			const metrics = ctx.measureText(line);
+			const underlineY = ly + size + 2;
+			ctx.beginPath();
+			ctx.strokeStyle = color;
+			ctx.lineWidth = Math.max(1, size / 12);
+			ctx.moveTo(x, underlineY);
+			ctx.lineTo(x + metrics.width, underlineY);
+			ctx.stroke();
+		}
 	});
 }

@@ -21,10 +21,12 @@ Open the URL shown in the terminal (usually http://localhost:5173).
 - Adjustments: brightness/contrast, HSL, levels, invert, grayscale, color balance
 - Filters: blur, sharpen, noise, pixelate, emboss
 - History: 50 states with undo/redo and click-to-jump
-- Export: PNG, JPEG, JSON project file
+- Export: PNG, JPEG, WebP, JSON project file
 - Keyboard shortcuts via **TanStack Hotkeys** (`Mod+Z`, `V`, `B`, etc.)
 - Autosaved drafts in IndexedDB
-- Virtualized layer list and history panel (**TanStack Virtual**)
+- Selection masking for paint/fill/eraser, invert selection, fixed-ratio marquee
+- Brush hardness, pencil pixel mode, non-contiguous magic wand
+- Paste at cursor, rulers overlay, EXIF metadata on import
 
 ## Stack
 

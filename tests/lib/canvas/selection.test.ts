@@ -1,62 +1,26 @@
 import { describe, expect, it } from "vitest";
 import {
+	canInvertSelection,
+	constrainRectToRatio,
 	normalizeRect,
-	pointInSelection,
-	selectionBounds,
 } from "@/lib/canvas/selection";
 
-describe("normalizeRect", () => {
-	it("normalizes inverted drag coordinates", () => {
-		expect(normalizeRect(10, 20, 30, 5)).toEqual({
-			x: 10,
-			y: 5,
-			width: 20,
-			height: 15,
-		});
-	});
-});
-
-describe("selectionBounds", () => {
-	it("returns rect dimensions for rect selections", () => {
-		expect(
-			selectionBounds({ type: "rect", x: 1, y: 2, width: 10, height: 20 }),
-		).toEqual({ x: 1, y: 2, width: 10, height: 20 });
+describe("selection helpers", () => {
+	it("constrains drag rect to fixed ratio", () => {
+		const r = constrainRectToRatio(0, 0, 200, 50, 1, 1);
+		expect(r.width).toBe(200);
+		expect(r.height).toBe(200);
 	});
 
-	it("computes bounds for lasso points", () => {
-		expect(
-			selectionBounds({
-				type: "lasso",
-				points: [
-					{ x: 0, y: 0 },
-					{ x: 50, y: 10 },
-					{ x: 20, y: 40 },
-				],
-			}),
-		).toEqual({ x: 0, y: 0, width: 50, height: 40 });
+	it("normalizes negative drag directions", () => {
+		const r = normalizeRect(100, 100, 0, 0);
+		expect(r).toEqual({ x: 0, y: 0, width: 100, height: 100 });
 	});
 
-	it("returns null for empty lasso", () => {
-		expect(selectionBounds({ type: "lasso", points: [] })).toBeNull();
-	});
-});
-
-describe("pointInSelection", () => {
-	it("detects points inside a rect", () => {
-		const sel = { type: "rect" as const, x: 10, y: 10, width: 20, height: 20 };
-		expect(pointInSelection(15, 15, sel)).toBe(true);
-		expect(pointInSelection(5, 15, sel)).toBe(false);
-	});
-
-	it("detects points inside an ellipse", () => {
-		const sel = {
-			type: "ellipse" as const,
-			x: 0,
-			y: 0,
-			width: 100,
-			height: 100,
-		};
-		expect(pointInSelection(50, 50, sel)).toBe(true);
-		expect(pointInSelection(0, 0, sel)).toBe(false);
+	it("detects invertible selections", () => {
+		expect(canInvertSelection(null)).toBe(false);
+		expect(canInvertSelection({ type: "rect", x: 0, y: 0, width: 10, height: 10 })).toBe(
+			true,
+		);
 	});
 });

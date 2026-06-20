@@ -6,16 +6,17 @@ import {
 import { drawLayerWithTransform } from "@/lib/canvas/transform";
 import type { Layer, LayerSnapshot } from "@/types/editor";
 
-export function exportFlattenedPng(
+function flattenToCanvas(
 	layers: Layer[],
 	width: number,
 	height: number,
-): void {
+	background: string,
+): HTMLCanvasElement {
 	const canvas = document.createElement("canvas");
 	canvas.width = width;
 	canvas.height = height;
 	const ctx = canvas.getContext("2d")!;
-	ctx.fillStyle = "#ffffff";
+	ctx.fillStyle = background;
 	ctx.fillRect(0, 0, width, height);
 
 	for (const layer of layers) {
@@ -27,6 +28,16 @@ export function exportFlattenedPng(
 		ctx.restore();
 	}
 
+	return canvas;
+}
+
+export function exportFlattenedPng(
+	layers: Layer[],
+	width: number,
+	height: number,
+	background = "#ffffff",
+): void {
+	const canvas = flattenToCanvas(layers, width, height, background);
 	downloadCanvas(canvas, "image.png");
 }
 
@@ -35,23 +46,26 @@ export function exportJpeg(
 	width: number,
 	height: number,
 	quality: number,
+	background = "#ffffff",
 ): void {
-	const canvas = document.createElement("canvas");
-	canvas.width = width;
-	canvas.height = height;
-	const ctx = canvas.getContext("2d")!;
-	ctx.fillStyle = "#ffffff";
-	ctx.fillRect(0, 0, width, height);
-	for (const layer of layers) {
-		if (!layer.visible) continue;
-		ctx.save();
-		ctx.globalAlpha = layer.opacity / 100;
-		drawLayerWithTransform(ctx, layer);
-		ctx.restore();
-	}
+	const canvas = flattenToCanvas(layers, width, height, background);
 	const link = document.createElement("a");
 	link.download = "image.jpg";
 	link.href = canvas.toDataURL("image/jpeg", quality / 100);
+	link.click();
+}
+
+export function exportWebp(
+	layers: Layer[],
+	width: number,
+	height: number,
+	quality: number,
+	background = "#ffffff",
+): void {
+	const canvas = flattenToCanvas(layers, width, height, background);
+	const link = document.createElement("a");
+	link.download = "image.webp";
+	link.href = canvas.toDataURL("image/webp", quality / 100);
 	link.click();
 }
 

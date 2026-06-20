@@ -61,6 +61,7 @@ export interface EditorState {
 	panX: number;
 	panY: number;
 	selection: Selection | null;
+	selectionInverted: boolean;
 	history: HistoryEntry[];
 	historyIndex: number;
 	canvasWidth: number;
@@ -114,6 +115,7 @@ type Action =
 	| { type: "SET_ZOOM"; zoom: number }
 	| { type: "SET_PAN"; panX: number; panY: number }
 	| { type: "SET_SELECTION"; selection: Selection | null }
+	| { type: "TOGGLE_SELECTION_INVERT" }
 	| { type: "SET_LAYERS"; layers: Layer[] }
 	| { type: "SET_ACTIVE_LAYER"; id: string }
 	| { type: "UPDATE_LAYER"; id: string; patch: Partial<Layer> }
@@ -262,7 +264,10 @@ function reducer(state: EditorState, action: Action): EditorState {
 		case "SET_PAN":
 			return { ...state, panX: action.panX, panY: action.panY };
 		case "SET_SELECTION":
-			return { ...state, selection: action.selection };
+			return { ...state, selection: action.selection, selectionInverted: false };
+		case "TOGGLE_SELECTION_INVERT":
+			if (!state.selection) return state;
+			return { ...state, selectionInverted: !state.selectionInverted };
 		case "SET_LAYERS":
 			return {
 				...state,
@@ -497,13 +502,14 @@ function createInitialState(): EditorState {
 		panX: 40,
 		panY: 40,
 		selection: null,
+		selectionInverted: false,
 		history: [entry],
 		historyIndex: 0,
 		canvasWidth: 800,
 		canvasHeight: 600,
 		canvasBackground: "#ffffff",
 		showGrid: false,
-		showRulers: true,
+		showRulers: false,
 		clipboard: null,
 		magicWandTolerance: 32,
 		fillTolerance: 32,

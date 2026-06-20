@@ -55,8 +55,8 @@ export function LayerProperties() {
 
 	return (
 		<>
-		<section className="sidebar-section shrink-0 px-2 py-2">
-			<div className="grid grid-cols-[1fr_1fr_auto] items-end gap-x-2 gap-y-2">
+		<section className="sidebar-section shrink-0 px-2 py-1.5">
+			<div className="grid grid-cols-[1fr_1fr_auto] items-end gap-x-2 gap-y-1">
 				<div>
 					<Label className="text-ui-xs text-zinc-600">X</Label>
 					<Input
@@ -92,11 +92,12 @@ export function LayerProperties() {
 				</p>
 			</div>
 
-			<div className="mt-2 flex items-center gap-2">
+			<div className="mt-1.5 flex items-center gap-2">
 				<Label className="w-12 shrink-0 text-ui-xs text-zinc-600">
 					Opacity
 				</Label>
 				<Slider
+					size="lg"
 					value={[active.opacity]}
 					min={0}
 					max={100}
@@ -115,17 +116,7 @@ export function LayerProperties() {
 				</span>
 			</div>
 
-			<div className="mt-2 space-y-1.5">
-				{isBackdrop ? (
-					<p className="text-[10px] leading-snug text-amber-400/90">
-						Background sheet cannot rotate. Select an object layer or add a new
-						layer.
-					</p>
-				) : (
-					<p className="text-[10px] leading-snug text-zinc-500">
-						Rotates this object only. The paper (canvas) stays fixed.
-					</p>
-				)}
+			<div className="mt-1.5 space-y-1">
 				<div className="flex items-center justify-between gap-2">
 					<Label className="text-ui-xs text-zinc-600">Angle</Label>
 					<span className="text-ui-xs tabular-nums text-zinc-400">
@@ -133,6 +124,7 @@ export function LayerProperties() {
 					</span>
 				</div>
 				<Slider
+					size="lg"
 					value={[rotation]}
 					min={0}
 					max={360}
@@ -172,16 +164,21 @@ export function LayerProperties() {
 						type="button"
 						variant="ghost"
 						size="sm"
-						className="h-7 w-full text-ui-xs text-zinc-400"
+						className="h-6 w-full text-[10px] text-zinc-500"
 						disabled={!canRotate}
 						onClick={bakeActiveLayerRotation}
 					>
-						Bake rotation into pixels
+						Bake rotation
 					</Button>
+				)}
+				{isBackdrop && (
+					<p className="text-[10px] leading-snug text-amber-400/80">
+						Background cannot rotate
+					</p>
 				)}
 			</div>
 
-			<div className="mt-2 flex items-center gap-2">
+			<div className="mt-1.5 flex items-center gap-2">
 				<Label className="w-12 shrink-0 text-ui-xs text-zinc-600">Blend</Label>
 				<Select
 					value={active.blendMode}

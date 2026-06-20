@@ -144,6 +144,7 @@ function ViewPanel() {
 			<div className="flex items-center gap-2">
 				<Label className="w-14 shrink-0 text-ui-xs text-zinc-600">Grid</Label>
 				<Slider
+					size="lg"
 					value={[state.gridSize]}
 					min={5}
 					max={100}
@@ -221,16 +222,21 @@ function HistoryPanel({
 
 function PanelSection({
 	title,
+	action,
 	children,
 }: {
 	title: string;
+	action?: React.ReactNode;
 	children: React.ReactNode;
 }) {
 	return (
-		<div className="space-y-2">
-			<p className="text-ui-xs font-semibold uppercase tracking-wide text-zinc-600">
-				{title}
-			</p>
+		<div className="space-y-1.5">
+			<div className="flex items-center justify-between gap-2">
+				<p className="text-ui-xs font-semibold uppercase tracking-wide text-zinc-600">
+					{title}
+				</p>
+				{action}
+			</div>
 			{children}
 		</div>
 	);
@@ -247,9 +253,26 @@ function AdjustmentSliders({
 	const [cb, setCb] = useState<[number, number, number]>([0, 0, 0]);
 
 	return (
-		<div className="space-y-4">
-			<PanelSection title="Tone">
-				<div className="space-y-2">
+		<div className="space-y-3">
+			<PanelSection
+				title="Tone"
+				action={
+					<Button
+						size="sm"
+						variant="outline"
+						className="h-6 px-2 text-[10px]"
+						onClick={() =>
+							onApply(
+								(ctx) => brightnessContrast(ctx, bc[0], bc[1]),
+								"Brightness/Contrast",
+							)
+						}
+					>
+						Apply
+					</Button>
+				}
+			>
+				<div className="space-y-1.5">
 					<AdjRow
 						label="Brightness"
 						value={bc[0]}
@@ -260,23 +283,28 @@ function AdjustmentSliders({
 						value={bc[1]}
 						onChange={(v) => setBc([bc[0], v])}
 					/>
-					<Button
-						size="sm"
-						className="h-7 w-full text-ui-xs"
-						onClick={() =>
-							onApply(
-								(ctx) => brightnessContrast(ctx, bc[0], bc[1]),
-								"Brightness/Contrast",
-							)
-						}
-					>
-						Apply
-					</Button>
 				</div>
 			</PanelSection>
 
-			<PanelSection title="Color">
-				<div className="space-y-2">
+			<PanelSection
+				title="Color"
+				action={
+					<Button
+						size="sm"
+						variant="outline"
+						className="h-6 px-2 text-[10px]"
+						onClick={() =>
+							onApply(
+								(ctx) => hueSaturationLightness(ctx, hsl[0], hsl[1], hsl[2]),
+								"HSL",
+							)
+						}
+					>
+						HSL
+					</Button>
+				}
+			>
+				<div className="space-y-1.5">
 					<AdjRow
 						label="Hue"
 						value={hsl[0]}
@@ -294,20 +322,8 @@ function AdjustmentSliders({
 						value={hsl[2]}
 						onChange={(v) => setHsl([hsl[0], hsl[1], v])}
 					/>
-					<Button
-						size="sm"
-						className="h-7 w-full text-ui-xs"
-						onClick={() =>
-							onApply(
-								(ctx) => hueSaturationLightness(ctx, hsl[0], hsl[1], hsl[2]),
-								"HSL",
-							)
-						}
-					>
-						Apply HSL
-					</Button>
 
-					<div className="grid grid-cols-3 gap-1">
+					<div className="grid grid-cols-3 gap-1 pt-0.5">
 						<div>
 							<Label className="text-ui-xs text-zinc-600">Blk</Label>
 							<Input
@@ -339,7 +355,8 @@ function AdjustmentSliders({
 					</div>
 					<Button
 						size="sm"
-						className="h-7 w-full text-ui-xs"
+						variant="outline"
+						className="h-6 w-full text-[10px]"
 						onClick={() =>
 							onApply((ctx) => levels(ctx, lv[0], lv[1], lv[2]), "Levels")
 						}
@@ -370,7 +387,8 @@ function AdjustmentSliders({
 					/>
 					<Button
 						size="sm"
-						className="h-7 w-full text-ui-xs"
+						variant="outline"
+						className="h-6 w-full text-[10px]"
 						onClick={() =>
 							onApply(
 								(ctx) => colorBalance(ctx, cb[0], cb[1], cb[2]),
@@ -422,11 +440,12 @@ function AdjRow({
 }) {
 	return (
 		<div>
-			<div className="mb-1 flex items-center justify-between">
+			<div className="mb-1 flex items-center justify-between gap-2">
 				<Label className="text-ui-xs text-zinc-600">{label}</Label>
 				<span className="text-ui-xs tabular-nums text-zinc-400">{value}</span>
 			</div>
 			<Slider
+				size="lg"
 				value={[value]}
 				min={min}
 				max={max}

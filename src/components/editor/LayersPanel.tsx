@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { LayerRow } from "@/components/editor/LayerRow";
 import { ToolTooltip } from "@/components/editor/ToolTooltip";
@@ -12,6 +12,7 @@ export function LayersPanel() {
 	const { state, dispatch, addLayer } = useEditor();
 	const [renaming, setRenaming] = useState<string | null>(null);
 	const [renameVal, setRenameVal] = useState("");
+	const [collapsed, setCollapsed] = useState(false);
 	const dragIdx = useRef<number | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -43,79 +44,93 @@ export function LayersPanel() {
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
 			<div className="panel-header flex items-center justify-between border-b border-zinc-800 px-2 py-1.5">
-				<span>Layers</span>
-			</div>
-
-			<div
-				ref={scrollRef}
-				className="smooth-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1.5"
-			>
-				<div
-					className="relative w-full p-1"
-					style={{ height: `${virtualizer.getTotalSize()}px` }}
+				<button
+					type="button"
+					className="interactive inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-300"
+					onClick={() => setCollapsed((v) => !v)}
 				>
-					{virtualizer.getVirtualItems().map((virtualRow) => {
-						const layer = layers[virtualRow.index]!;
-						const realIdx = state.layers.findIndex((l) => l.id === layer.id);
-						const isActive = layer.id === state.activeLayerId;
-
-						return (
-							<div
-								key={layer.id}
-								className="absolute left-0 top-0 w-full px-0"
-								style={{
-									height: `${virtualRow.size}px`,
-									transform: `translateY(${virtualRow.start}px)`,
-								}}
-							>
-								<LayerRow
-									layer={layer}
-									isActive={isActive}
-									renaming={renaming === layer.id}
-									renameVal={renameVal}
-									onSelect={() =>
-										dispatch({ type: "SET_ACTIVE_LAYER", id: layer.id })
-									}
-									onStartRename={() => startRename(layer.id, layer.name)}
-									onRenameChange={setRenameVal}
-									onCommitRename={commitRename}
-									onToggleVisible={() =>
-										dispatch({
-											type: "UPDATE_LAYER",
-											id: layer.id,
-											patch: { visible: !layer.visible },
-										})
-									}
-									onToggleLocked={() =>
-										dispatch({
-											type: "UPDATE_LAYER",
-											id: layer.id,
-											patch: { locked: !layer.locked },
-										})
-									}
-									onDragStart={() => {
-										dragIdx.current = realIdx;
-									}}
-									onDragOver={(e) => e.preventDefault()}
-									onDrop={() => {
-										if (
-											dragIdx.current !== null &&
-											dragIdx.current !== realIdx
-										) {
-											dispatch({
-												type: "REORDER_LAYERS",
-												from: dragIdx.current,
-												to: realIdx,
-											});
-										}
-										dragIdx.current = null;
-									}}
-								/>
-							</div>
-						);
-					})}
-				</div>
+					<ChevronDown
+						className={`h-3.5 w-3.5 transition-transform ${collapsed ? "-rotate-90" : ""}`}
+					/>
+					<span>Layers</span>
+				</button>
+				<span className="text-[10px] tabular-nums text-zinc-600">
+					{state.layers.length}
+				</span>
 			</div>
+
+			{!collapsed && (
+				<div
+					ref={scrollRef}
+					className="smooth-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1.5"
+				>
+					<div
+						className="relative w-full p-1"
+						style={{ height: `${virtualizer.getTotalSize()}px` }}
+					>
+						{virtualizer.getVirtualItems().map((virtualRow) => {
+							const layer = layers[virtualRow.index]!;
+							const realIdx = state.layers.findIndex((l) => l.id === layer.id);
+							const isActive = layer.id === state.activeLayerId;
+
+							return (
+								<div
+									key={layer.id}
+									className="absolute left-0 top-0 w-full px-0"
+									style={{
+										height: `${virtualRow.size}px`,
+										transform: `translateY(${virtualRow.start}px)`,
+									}}
+								>
+									<LayerRow
+										layer={layer}
+										isActive={isActive}
+										renaming={renaming === layer.id}
+										renameVal={renameVal}
+										onSelect={() =>
+											dispatch({ type: "SET_ACTIVE_LAYER", id: layer.id })
+										}
+										onStartRename={() => startRename(layer.id, layer.name)}
+										onRenameChange={setRenameVal}
+										onCommitRename={commitRename}
+										onToggleVisible={() =>
+											dispatch({
+												type: "UPDATE_LAYER",
+												id: layer.id,
+												patch: { visible: !layer.visible },
+											})
+										}
+										onToggleLocked={() =>
+											dispatch({
+												type: "UPDATE_LAYER",
+												id: layer.id,
+												patch: { locked: !layer.locked },
+											})
+										}
+										onDragStart={() => {
+											dragIdx.current = realIdx;
+										}}
+										onDragOver={(e) => e.preventDefault()}
+										onDrop={() => {
+											if (
+												dragIdx.current !== null &&
+												dragIdx.current !== realIdx
+											) {
+												dispatch({
+													type: "REORDER_LAYERS",
+													from: dragIdx.current,
+													to: realIdx,
+												});
+											}
+											dragIdx.current = null;
+										}}
+									/>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			)}
 
 			<div className="flex gap-0.5 border-t border-zinc-800 px-1 py-1">
 				{[

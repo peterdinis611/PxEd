@@ -44,6 +44,7 @@ function SliderControl({
 				{label}
 			</span>
 			<Slider
+				size="lg"
 				value={[value]}
 				min={min}
 				max={max}
@@ -156,8 +157,8 @@ export function OptionsBar() {
 	};
 
 	return (
-		<div className="chrome-bar w-full px-2 py-1.5">
-			<div className="flex min-h-[2rem] items-center gap-2">
+		<div className="chrome-bar w-full px-2 py-1">
+			<div className="flex min-h-[1.75rem] items-center gap-2">
 				<motion.span
 					key={tool}
 					initial={{ opacity: 0 }}
@@ -224,78 +225,82 @@ export function OptionsBar() {
 				<AnimatePresence mode="wait">
 					<motion.div key={tool} className="min-w-0 flex-1" {...fadeSlideRight}>
 						{(tool === "brush" || tool === "pencil") && (
-							<OptionsStrip>
-								<SliderControl
-									label="Size"
-									value={brush.size}
-									min={1}
-									max={500}
-									onChange={(size) => setBrush({ size })}
-								/>
-								<SliderControl
-									label="Hardness"
-									value={brush.hardness}
-									min={0}
-									max={100}
-									onChange={(hardness) => setBrush({ hardness })}
-								/>
-								<SliderControl
-									label="Opacity"
-									value={brush.opacity}
-									min={1}
-									max={100}
-									onChange={(opacity) => setBrush({ opacity })}
-								/>
-								<SliderControl
-									label="Flow"
-									value={brush.flow}
-									min={1}
-									max={100}
-									onChange={(flow) => setBrush({ flow })}
-								/>
-								<SliderControl
-									label="Spacing"
-									value={brush.spacing}
-									min={1}
-									max={100}
-									onChange={(spacing) => setBrush({ spacing })}
-								/>
-								<SliderControl
-									label="Smooth"
-									value={brush.smoothing}
-									min={0}
-									max={100}
-									onChange={(smoothing) => setBrush({ smoothing })}
-								/>
-								<Select
-									value={brush.blendMode}
-									onValueChange={(v) =>
-										setBrush({ blendMode: v as typeof brush.blendMode })
-									}
-								>
-									<SelectTrigger className="h-7 w-[7.5rem] text-ui-xs capitalize">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{[
-											"source-over",
-											"multiply",
-											"screen",
-											"overlay",
-											"darken",
-											"lighten",
-										].map((m) => (
-											<SelectItem
-												key={m}
-												value={m}
-												className="text-ui-xs capitalize"
-											>
-												{m}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</OptionsStrip>
+							<div className="flex min-w-0 flex-1 flex-col gap-1">
+								<OptionsStrip>
+									<SliderControl
+										label="Size"
+										value={brush.size}
+										min={1}
+										max={500}
+										onChange={(size) => setBrush({ size })}
+									/>
+									<SliderControl
+										label="Hardness"
+										value={brush.hardness}
+										min={0}
+										max={100}
+										onChange={(hardness) => setBrush({ hardness })}
+									/>
+									<SliderControl
+										label="Opacity"
+										value={brush.opacity}
+										min={1}
+										max={100}
+										onChange={(opacity) => setBrush({ opacity })}
+									/>
+									<SliderControl
+										label="Flow"
+										value={brush.flow}
+										min={1}
+										max={100}
+										onChange={(flow) => setBrush({ flow })}
+									/>
+								</OptionsStrip>
+								<OptionsStrip>
+									<SliderControl
+										label="Spacing"
+										value={brush.spacing}
+										min={1}
+										max={100}
+										onChange={(spacing) => setBrush({ spacing })}
+									/>
+									<SliderControl
+										label="Smooth"
+										value={brush.smoothing}
+										min={0}
+										max={100}
+										onChange={(smoothing) => setBrush({ smoothing })}
+									/>
+									<Select
+										value={brush.blendMode}
+										onValueChange={(v) =>
+											setBrush({ blendMode: v as typeof brush.blendMode })
+										}
+									>
+										<SelectTrigger className="h-7 w-[7.5rem] text-ui-xs capitalize">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{[
+												"source-over",
+												"multiply",
+												"screen",
+												"overlay",
+												"darken",
+												"lighten",
+											].map((m) => (
+												<SelectItem
+													key={m}
+													value={m}
+													className="text-ui-xs capitalize"
+												>
+													{m}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</OptionsStrip>
+							</div>
 						)}
 
 						{tool === "eraser" && (

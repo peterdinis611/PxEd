@@ -46,6 +46,9 @@ export interface TextData {
 	align: CanvasTextAlign;
 	x: number;
 	y: number;
+	underline?: boolean;
+	/** Percent of font size, e.g. 120 = 1.2× */
+	lineHeight?: number;
 }
 
 export interface Layer {

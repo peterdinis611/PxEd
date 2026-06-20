@@ -7,10 +7,13 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { CanvasRulers } from "@/components/editor/CanvasRulers";
 import { EditorKonvaStage } from "@/components/editor/EditorKonvaStage";
 import { LayerSelectionOverlay } from "@/components/editor/LayerSelectionOverlay";
 import { ShapeDrawPreviewOverlay } from "@/components/editor/ShapeDrawPreview";
+import { Button } from "@/components/ui/button";
 import { useEditor } from "@/context/EditorContext";
+import { brushOptionsFromState, drawBrushStroke } from "@/lib/canvas/brush";
 import { screenToDoc } from "@/lib/canvas/composite";
 import { floodFill, magicWandSelect } from "@/lib/canvas/floodFill";
 import {
@@ -20,7 +23,11 @@ import {
 	isNearRotateHandle,
 } from "@/lib/canvas/layerBounds";
 import { createLayer, renderTextLayer } from "@/lib/canvas/layers";
-import { normalizeRect } from "@/lib/canvas/selection";
+import {
+	constrainRectToRatio,
+	normalizeRect,
+	withSelectionClip,
+} from "@/lib/canvas/selection";
 import { drawArrow } from "@/lib/canvas/shapes";
 import {
 	sampleColorAtDocPoint,
@@ -248,19 +255,19 @@ export function CanvasArea({
 		dispatch({ type: "ADD_RECENT_COLOR", color: hex });
 	};
 
-	const setupBrush = (ctx: CanvasRenderingContext2D, eraser = false) => {
-		const { brush, foregroundColor } = state;
-		ctx.lineCap = "round";
-		ctx.lineJoin = "round";
-		ctx.lineWidth = brush.size;
-		ctx.globalAlpha = (brush.opacity / 100) * (brush.flow / 100);
-		if (eraser) {
-			ctx.globalCompositeOperation = "destination-out";
-			ctx.strokeStyle = "rgba(0,0,0,1)";
-		} else {
-			ctx.globalCompositeOperation = brush.blendMode;
-			ctx.strokeStyle = foregroundColor;
-		}
+	const paintWithSelection = (
+		fn: (ctx: CanvasRenderingContext2D) => void,
+		layer: NonNullable<typeof activeLayer>,
+	) => {
+		const ctx = layer.canvas.getContext("2d")!;
+		withSelectionClip(
+			ctx,
+			state.selection,
+			state.canvasWidth,
+			state.canvasHeight,
+			state.selectionInverted,
+			fn,
+		);
 	};
 
 	const drawStroke = (
@@ -269,15 +276,35 @@ export function CanvasArea({
 		y0: number,
 		x1: number,
 		y1: number,
-		eraser = false,
+		tool: "brush" | "pencil" | "eraser",
 	) => {
-		setupBrush(ctx, eraser);
-		ctx.beginPath();
-		ctx.moveTo(x0, y0);
-		ctx.lineTo(x1, y1);
-		ctx.stroke();
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "source-over";
+		drawBrushStroke(
+			ctx,
+			x0,
+			y0,
+			x1,
+			y1,
+			brushOptionsFromState(state.brush, state.foregroundColor, tool),
+		);
+	};
+
+	const constrainMarqueeRect = (
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number,
+	) => {
+		if (state.marquee.fixedRatio) {
+			return constrainRectToRatio(
+				x0,
+				y0,
+				x1,
+				y1,
+				state.marquee.ratioW,
+				state.marquee.ratioH,
+			);
+		}
+		return normalizeRect(x0, y0, x1, y1);
 	};
 
 	const startPan = (e: React.MouseEvent) => {
@@ -407,7 +434,13 @@ export function CanvasArea({
 
 		if (tool === "magic-wand") {
 			const ctx = layer.canvas.getContext("2d")!;
-			const bounds = magicWandSelect(ctx, x, y, state.magicWandTolerance);
+			const bounds = magicWandSelect(
+				ctx,
+				x,
+				y,
+				state.magicWandTolerance,
+				state.contiguousWand,
+			);
 			if (bounds) {
 				dispatch({
 					type: "SET_SELECTION",
@@ -418,12 +451,11 @@ export function CanvasArea({
 		}
 
 		if (tool === "fill") {
-			updateActiveLayerCanvas((ctx) => {
-				ctx.save();
+			paintWithSelection((ctx) => {
 				ctx.globalAlpha = state.fillOpacity / 100;
 				floodFill(ctx, x, y, state.foregroundColor, state.fillTolerance);
-				ctx.restore();
-			});
+			}, layer);
+			dispatch({ type: "BUMP_RENDER" });
 			commitHistory("Fill");
 			return;
 		}
@@ -441,6 +473,8 @@ export function CanvasArea({
 				align: state.textAlign,
 				x: Math.floor(x),
 				y: Math.floor(y),
+				underline: state.textUnderline,
+				lineHeight: state.textLineHeight,
 			};
 			if (layer.type !== "text") {
 				const newLayer = createLayer(
@@ -536,7 +570,7 @@ export function CanvasArea({
 			tool === "marquee-ellipse" ||
 			tool === "crop"
 		) {
-			const rect = normalizeRect(drag.startX, drag.startY, x, y);
+			const rect = constrainMarqueeRect(drag.startX, drag.startY, x, y);
 			if (tool === "crop") {
 				setPreviewSel({ type: "rect", ...rect });
 			} else {
@@ -559,8 +593,9 @@ export function CanvasArea({
 			(tool === "brush" || tool === "pencil" || tool === "eraser") &&
 			activeLayer
 		) {
-			const ctx = activeLayer.canvas.getContext("2d")!;
-			drawStroke(ctx, drag.lastX, drag.lastY, x, y, tool === "eraser");
+			paintWithSelection((ctx) => {
+				drawStroke(ctx, drag.lastX, drag.lastY, x, y, tool);
+			}, activeLayer);
 			drag.lastX = x;
 			drag.lastY = y;
 			scheduleRender();
@@ -834,6 +869,18 @@ export function CanvasArea({
 		canvasW <= (viewport.w || canvasW) + 1 &&
 		canvasH <= (viewport.h || canvasH) + 1;
 
+	const [workspaceScroll, setWorkspaceScroll] = useState({ x: 0, y: 0 });
+
+	useEffect(() => {
+		const el = containerRef.current;
+		if (!el) return;
+		const onScroll = () =>
+			setWorkspaceScroll({ x: el.scrollLeft, y: el.scrollTop });
+		onScroll();
+		el.addEventListener("scroll", onScroll, { passive: true });
+		return () => el.removeEventListener("scroll", onScroll);
+	}, [viewport.w, viewport.h]);
+
 	const renderSelectionOverlay = () => {
 		if (!sel) return null;
 		if (sel.type === "lasso" && sel.points.length > 1) {
@@ -931,6 +978,18 @@ export function CanvasArea({
 			onMouseUp={(e) => onMouseUp(e)}
 			onMouseLeave={(e) => onMouseUp(e)}
 		>
+			{state.showRulers && (
+				<CanvasRulers
+					scrollX={workspaceScroll.x}
+					scrollY={workspaceScroll.y}
+					viewportW={viewport.w}
+					viewportH={viewport.h}
+					layout={layout}
+					docWidth={state.canvasWidth}
+					docHeight={state.canvasHeight}
+					gridSize={state.gridSize}
+				/>
+			)}
 			<div
 				className="relative min-h-full min-w-full"
 				style={{
@@ -1013,6 +1072,45 @@ export function CanvasArea({
 					</motion.div>
 				)}
 			</AnimatePresence>
+			<div className="pointer-events-none absolute bottom-3 left-3 z-20">
+				<div className="pointer-events-auto flex items-center gap-1 rounded-md border border-zinc-700/80 bg-zinc-900/85 p-1 shadow-lg">
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="h-6 px-2 text-ui-xs"
+						onClick={() => {
+							const next = Math.max(5, state.zoom - 25);
+							dispatch({ type: "SET_ZOOM", zoom: next });
+							showZoomHint(next);
+						}}
+					>
+						-
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="h-6 min-w-14 px-2 text-ui-xs tabular-nums text-zinc-300"
+						onClick={() => dispatch({ type: "REQUEST_FIT_TO_SCREEN" })}
+					>
+						{Math.round(state.zoom)}%
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className="h-6 px-2 text-ui-xs"
+						onClick={() => {
+							const next = Math.min(800, state.zoom + 25);
+							dispatch({ type: "SET_ZOOM", zoom: next });
+							showZoomHint(next);
+						}}
+					>
+						+
+					</Button>
+				</div>
+			</div>
 		</div>
 	);
 }

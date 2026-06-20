@@ -98,6 +98,7 @@ export function magicWandSelect(
 	startX: number,
 	startY: number,
 	tolerance = 32,
+	contiguous = true,
 ): { x: number; y: number; width: number; height: number } | null {
 	const { width, height } = ctx.canvas;
 	const imageData = ctx.getImageData(0, 0, width, height);
@@ -114,13 +115,6 @@ export function magicWandSelect(
 		data[startIdx + 3]!,
 	];
 
-	const visited = new Uint8Array(width * height);
-	const stack: [number, number][] = [[sx, sy]];
-	let minX = sx,
-		minY = sy,
-		maxX = sx,
-		maxY = sy;
-
 	const match = (idx: number) => {
 		const r = data[idx]!;
 		const g = data[idx + 1]!;
@@ -133,6 +127,37 @@ export function magicWandSelect(
 			Math.abs(a - target[3]!) <= tolerance
 		);
 	};
+
+	if (!contiguous) {
+		let minX = width;
+		let minY = height;
+		let maxX = -1;
+		let maxY = -1;
+		for (let y = 0; y < height; y++) {
+			for (let x = 0; x < width; x++) {
+				const idx = (y * width + x) * 4;
+				if (!match(idx)) continue;
+				minX = Math.min(minX, x);
+				minY = Math.min(minY, y);
+				maxX = Math.max(maxX, x);
+				maxY = Math.max(maxY, y);
+			}
+		}
+		if (maxX < minX) return null;
+		return {
+			x: minX,
+			y: minY,
+			width: maxX - minX + 1,
+			height: maxY - minY + 1,
+		};
+	}
+
+	const visited = new Uint8Array(width * height);
+	const stack: [number, number][] = [[sx, sy]];
+	let minX = sx,
+		minY = sy,
+		maxX = sx,
+		maxY = sy;
 
 	while (stack.length > 0) {
 		const [x, y] = stack.pop()!;
