@@ -48,6 +48,10 @@ import { snapPoint } from "@/lib/canvas/snap";
 import { snapLayerMove, type SnapGuide } from "@/lib/canvas/snapGuides";
 import { ensureLayerMask } from "@/lib/canvas/transform";
 import {
+	ensureTextFonts,
+	loadGoogleFontForText,
+} from "@/lib/fonts/textFont";
+import {
 	computeFitViewport,
 	getViewportLayout,
 	type ViewportLayout,
@@ -224,6 +228,25 @@ export function CanvasArea({
 			e.pointerType,
 		);
 	};
+
+	const textLayerFontKey = state.layers
+		.filter((l) => l.type === "text" && l.textData)
+		.map(
+			(l) =>
+				`${l.id}:${l.textData!.font}:${l.textData!.bold}:${l.textData!.italic}`,
+		)
+		.join("|");
+
+	useEffect(() => {
+		if (!textLayerFontKey) return;
+		let cancelled = false;
+		void ensureTextFonts(state.layers).then(() => {
+			if (!cancelled) dispatch({ type: "BUMP_RENDER" });
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [textLayerFontKey, dispatch, state.layers]);
 
 	const updateViewportSize = useCallback(() => {
 		const el = containerRef.current;
@@ -1263,29 +1286,33 @@ export function CanvasArea({
 								return;
 							}
 							const textData = { ...textDraft };
-							if (!activeLayer || activeLayer.type !== "text") {
-								const newLayer = createLayer(
-									state.canvasWidth,
-									state.canvasHeight,
-									"Text",
-									{ type: "text", textData },
-								);
-								renderTextLayer(newLayer);
-								dispatch({
-									type: "SET_LAYERS",
-									layers: [...state.layers, newLayer],
-								});
-								dispatch({ type: "SET_ACTIVE_LAYER", id: newLayer.id });
-							} else {
-								dispatch({
-									type: "UPDATE_LAYER",
-									id: activeLayer.id,
-									patch: { textData, type: "text" },
-								});
-								renderTextLayer({ ...activeLayer, textData, type: "text" });
-							}
-							commitHistory("Text");
-							setTextDraft(null);
+							void (async () => {
+								await loadGoogleFontForText(textData);
+								if (!activeLayer || activeLayer.type !== "text") {
+									const newLayer = createLayer(
+										state.canvasWidth,
+										state.canvasHeight,
+										"Text",
+										{ type: "text", textData },
+									);
+									renderTextLayer(newLayer);
+									dispatch({
+										type: "SET_LAYERS",
+										layers: [...state.layers, newLayer],
+									});
+									dispatch({ type: "SET_ACTIVE_LAYER", id: newLayer.id });
+								} else {
+									dispatch({
+										type: "UPDATE_LAYER",
+										id: activeLayer.id,
+										patch: { textData, type: "text" },
+									});
+									renderTextLayer({ ...activeLayer, textData, type: "text" });
+								}
+								commitHistory("Text");
+								setTextDraft(null);
+								dispatch({ type: "BUMP_RENDER" });
+							})();
 						}}
 					/>
 				)}

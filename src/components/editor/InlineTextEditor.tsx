@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { loadGoogleFontForText } from "@/lib/fonts/textFont";
 import type { TextData } from "@/types/editor";
 import type { ViewportLayout } from "@/lib/canvas/viewport";
 
@@ -26,6 +27,14 @@ export function InlineTextEditor({
 		ref.current?.focus();
 		ref.current?.select();
 	}, []);
+
+	useEffect(() => {
+		void loadGoogleFontForText({
+			font: draft.font,
+			bold: draft.bold,
+			italic: draft.italic,
+		});
+	}, [draft.font, draft.bold, draft.italic]);
 
 	return (
 		<div

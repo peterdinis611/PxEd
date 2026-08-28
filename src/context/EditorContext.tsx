@@ -580,7 +580,7 @@ function createInitialState(): EditorState {
 		clipboard: null,
 		magicWandTolerance: 32,
 		fillTolerance: 32,
-		textFont: "Arial",
+		textFont: "Inter",
 		textSize: 24,
 		textBold: false,
 		textItalic: false,

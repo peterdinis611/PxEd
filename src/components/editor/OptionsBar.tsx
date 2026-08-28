@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect } from "react";
 import { ColorPicker } from "@/components/editor/ColorPicker";
+import { FontPicker } from "@/components/editor/FontPicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,10 +13,12 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { useEditor } from "@/context/EditorContext";
+import { renderTextLayer } from "@/lib/canvas/layers";
+import { loadGoogleFontForText } from "@/lib/fonts/textFont";
 import { snapCoord } from "@/lib/canvas/snap";
 import { fadeSlideRight } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { BRUSH_PRESETS, type ToolName } from "@/types/editor";
+import { BRUSH_PRESETS, type TextData, type ToolName } from "@/types/editor";
 
 function SliderControl({
 	label,
@@ -157,6 +161,34 @@ export function OptionsBar() {
 		});
 		dispatch({ type: "ADD_RECENT_COLOR", color });
 	};
+
+	const refreshActiveTextLayer = useCallback(
+		async (patch: Partial<TextData>) => {
+			if (!activeLayer || activeLayer.type !== "text" || !activeLayer.textData) {
+				return;
+			}
+			const textData = { ...activeLayer.textData, ...patch };
+			await loadGoogleFontForText(textData);
+			const next = { ...activeLayer, textData };
+			renderTextLayer(next);
+			dispatch({
+				type: "UPDATE_LAYER",
+				id: activeLayer.id,
+				patch: { textData },
+			});
+			dispatch({ type: "BUMP_RENDER" });
+		},
+		[activeLayer, dispatch],
+	);
+
+	useEffect(() => {
+		if (tool !== "text") return;
+		void loadGoogleFontForText({
+			font: state.textFont,
+			bold: state.textBold,
+			italic: state.textItalic,
+		});
+	}, [tool, state.textFont, state.textBold, state.textItalic]);
 
 	return (
 		<div className="chrome-bar w-full px-2 py-1">
@@ -739,15 +771,17 @@ export function OptionsBar() {
 
 						{tool === "text" && (
 							<OptionsStrip>
-								<Input
-									className="h-7 w-32 text-ui-xs"
+								<FontPicker
 									value={state.textFont}
-									onChange={(e) =>
+									bold={state.textBold}
+									italic={state.textItalic}
+									onChange={(textFont) => {
 										dispatch({
 											type: "SET_TEXT_OPTS",
-											patch: { textFont: e.target.value },
-										})
-									}
+											patch: { textFont },
+										});
+										void refreshActiveTextLayer({ font: textFont });
+									}}
 								/>
 								<SliderControl
 									label="Size"
@@ -767,23 +801,27 @@ export function OptionsBar() {
 								/>
 								<ToggleBtn
 									active={state.textBold}
-									onClick={() =>
+									onClick={() => {
+										const textBold = !state.textBold;
 										dispatch({
 											type: "SET_TEXT_OPTS",
-											patch: { textBold: !state.textBold },
-										})
-									}
+											patch: { textBold },
+										});
+										void refreshActiveTextLayer({ bold: textBold });
+									}}
 								>
 									B
 								</ToggleBtn>
 								<ToggleBtn
 									active={state.textItalic}
-									onClick={() =>
+									onClick={() => {
+										const textItalic = !state.textItalic;
 										dispatch({
 											type: "SET_TEXT_OPTS",
-											patch: { textItalic: !state.textItalic },
-										})
-									}
+											patch: { textItalic },
+										});
+										void refreshActiveTextLayer({ italic: textItalic });
+									}}
 								>
 									I
 								</ToggleBtn>
