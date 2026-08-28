@@ -1,18 +1,12 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useRef, useState } from "react";
+import { FiltersGallery } from "@/components/editor/FiltersGallery";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useEditor } from "@/context/EditorContext";
-import {
-	brightnessContrast,
-	colorBalance,
-	grayscale,
-	hueSaturationLightness,
-	invertColors,
-	levels,
-} from "@/lib/canvas/adjustments";
+import type { ImageOpPayload } from "@/lib/canvas/imageOpsCore";
 import { cn } from "@/lib/utils";
 
 type PanelTab = "edit" | "view" | "history";
@@ -27,16 +21,12 @@ const HISTORY_ROW_HEIGHT = 30;
 
 export function PropertiesPanel() {
 	const [tab, setTab] = useState<PanelTab>("edit");
-	const { activeLayer, commitHistory, updateActiveLayerCanvas } = useEditor();
+	const { activeLayer, runActiveLayerImageOp } = useEditor();
 	const scrollRef = useRef<HTMLDivElement>(null);
 
-	const applyAdj = (
-		fn: (ctx: CanvasRenderingContext2D) => void,
-		label: string,
-	) => {
+	const applyOp = (payload: ImageOpPayload, label: string) => {
 		if (!activeLayer) return;
-		updateActiveLayerCanvas(fn);
-		commitHistory(label);
+		void runActiveLayerImageOp(payload, label);
 	};
 
 	return (
@@ -70,7 +60,7 @@ export function PropertiesPanel() {
 				className="smooth-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2"
 			>
 				{tab === "edit" && (
-					<EditPanel onApply={applyAdj} hasLayer={!!activeLayer} />
+					<EditPanel onApply={applyOp} hasLayer={!!activeLayer} />
 				)}
 				{tab === "view" && <ViewPanel />}
 				{tab === "history" && <HistoryPanel scrollRef={scrollRef} />}
@@ -83,7 +73,7 @@ function EditPanel({
 	onApply,
 	hasLayer,
 }: {
-	onApply: (fn: (ctx: CanvasRenderingContext2D) => void, label: string) => void;
+	onApply: (payload: ImageOpPayload, label: string) => void;
 	hasLayer: boolean;
 }) {
 	if (!hasLayer) {
@@ -94,7 +84,14 @@ function EditPanel({
 		);
 	}
 
-	return <AdjustmentSliders onApply={onApply} />;
+	return (
+		<div className="space-y-3">
+			<AdjustmentSliders onApply={onApply} />
+			<PanelSection title="Filters">
+				<FiltersGallery />
+			</PanelSection>
+		</div>
+	);
 }
 
 function ViewPanel() {
@@ -168,21 +165,12 @@ function HistoryPanel({
 	scrollRef: React.RefObject<HTMLDivElement | null>;
 }) {
 	const { state, dispatch } = useEditor();
-
 	const virtualizer = useVirtualizer({
 		count: state.history.length,
 		getScrollElement: () => scrollRef.current,
 		estimateSize: () => HISTORY_ROW_HEIGHT,
 		overscan: 8,
 	});
-
-	if (state.history.length === 0) {
-		return (
-			<p className="py-4 text-center text-ui-xs text-zinc-600">
-				No history yet
-			</p>
-		);
-	}
 
 	return (
 		<div
@@ -194,7 +182,7 @@ function HistoryPanel({
 				const h = state.history[i]!;
 				return (
 					<div
-						key={`${i}-${h.description}`}
+						key={virtualRow.key}
 						className="absolute left-0 top-0 w-full"
 						style={{
 							height: `${virtualRow.size}px`,
@@ -245,7 +233,7 @@ function PanelSection({
 function AdjustmentSliders({
 	onApply,
 }: {
-	onApply: (fn: (ctx: CanvasRenderingContext2D) => void, label: string) => void;
+	onApply: (payload: ImageOpPayload, label: string) => void;
 }) {
 	const [bc, setBc] = useState<[number, number]>([0, 0]);
 	const [hsl, setHsl] = useState<[number, number, number]>([0, 0, 0]);
@@ -263,7 +251,11 @@ function AdjustmentSliders({
 						className="h-6 px-2 text-[10px]"
 						onClick={() =>
 							onApply(
-								(ctx) => brightnessContrast(ctx, bc[0], bc[1]),
+								{
+									op: "brightnessContrast",
+									brightness: bc[0],
+									contrast: bc[1],
+								},
 								"Brightness/Contrast",
 							)
 						}
@@ -295,7 +287,7 @@ function AdjustmentSliders({
 						className="h-6 px-2 text-[10px]"
 						onClick={() =>
 							onApply(
-								(ctx) => hueSaturationLightness(ctx, hsl[0], hsl[1], hsl[2]),
+								{ op: "hsl", hue: hsl[0], sat: hsl[1], light: hsl[2] },
 								"HSL",
 							)
 						}
@@ -358,7 +350,15 @@ function AdjustmentSliders({
 						variant="outline"
 						className="h-6 w-full text-[10px]"
 						onClick={() =>
-							onApply((ctx) => levels(ctx, lv[0], lv[1], lv[2]), "Levels")
+							onApply(
+								{
+									op: "levels",
+									blackIn: lv[0],
+									gamma: lv[1],
+									whiteIn: lv[2],
+								},
+								"Levels",
+							)
 						}
 					>
 						Apply levels
@@ -391,7 +391,12 @@ function AdjustmentSliders({
 						className="h-6 w-full text-[10px]"
 						onClick={() =>
 							onApply(
-								(ctx) => colorBalance(ctx, cb[0], cb[1], cb[2]),
+								{
+									op: "colorBalance",
+									cyanRed: cb[0],
+									magentaGreen: cb[1],
+									yellowBlue: cb[2],
+								},
 								"Color Balance",
 							)
 						}
@@ -407,7 +412,7 @@ function AdjustmentSliders({
 						size="sm"
 						variant="ghost"
 						className="h-7 flex-1 text-ui-xs"
-						onClick={() => onApply(invertColors, "Invert")}
+						onClick={() => onApply({ op: "invert" }, "Invert")}
 					>
 						Invert
 					</Button>
@@ -415,7 +420,7 @@ function AdjustmentSliders({
 						size="sm"
 						variant="ghost"
 						className="h-7 flex-1 text-ui-xs"
-						onClick={() => onApply(grayscale, "Grayscale")}
+						onClick={() => onApply({ op: "grayscale" }, "Grayscale")}
 					>
 						Gray
 					</Button>

@@ -38,7 +38,8 @@ import {
 	clampDocumentSize,
 	getHistoryLimit,
 } from "@/lib/canvas/documentLimits";
-import { DEFAULT_BRUSH, DEFAULT_MARQUEE, DEFAULT_SHAPE } from "@/types/editor";
+import { DEFAULT_BRUSH, DEFAULT_GRADIENT, DEFAULT_MARQUEE, DEFAULT_SHAPE } from "@/types/editor";
+import type { GradientSettings } from "@/types/editor";
 
 export interface EditorState {
 	layers: Layer[];
@@ -53,6 +54,7 @@ export interface EditorState {
 	gridSize: number;
 	eyedropperSample: number;
 	gradientAngle: number;
+	gradient: GradientSettings;
 	fillOpacity: number;
 	textUnderline: boolean;
 	textLineHeight: number;
@@ -79,6 +81,10 @@ export interface EditorState {
 	textItalic: boolean;
 	textAlign: CanvasTextAlign;
 	recentColors: string[];
+	/** Recent brush settings for quick recall. */
+	recentBrushes: BrushSettings[];
+	/** Clone-stamp source point in document space. */
+	cloneSource: { x: number; y: number } | null;
 	renderTick: number;
 	fitRequest: number;
 }
@@ -105,6 +111,7 @@ type Action =
 					EditorState,
 					| "eyedropperSample"
 					| "gradientAngle"
+					| "gradient"
 					| "fillOpacity"
 					| "contiguousWand"
 					| "textUnderline"
@@ -116,6 +123,8 @@ type Action =
 	| { type: "SET_PAN"; panX: number; panY: number }
 	| { type: "SET_SELECTION"; selection: Selection | null }
 	| { type: "TOGGLE_SELECTION_INVERT" }
+	| { type: "SET_CLONE_SOURCE"; point: { x: number; y: number } | null }
+	| { type: "PUSH_RECENT_BRUSH" }
 	| { type: "SET_LAYERS"; layers: Layer[] }
 	| { type: "SET_ACTIVE_LAYER"; id: string }
 	| { type: "UPDATE_LAYER"; id: string; patch: Partial<Layer> }
@@ -160,7 +169,20 @@ type Action =
 			state: Pick<
 				EditorState,
 				"layers" | "canvasWidth" | "canvasHeight" | "activeLayerId"
-			>;
+			> & {
+				selection?: Selection | null;
+				selectionInverted?: boolean;
+				canvasBackground?: string;
+				view?: {
+					zoom: number;
+					panX: number;
+					panY: number;
+					showGrid: boolean;
+					showRulers: boolean;
+					snapToGrid: boolean;
+					gridSize: number;
+				};
+			};
 	  }
 	| {
 			type: "RESTORE_DRAFT";
@@ -244,6 +266,22 @@ function reducer(state: EditorState, action: Action): EditorState {
 			};
 		case "SET_BRUSH":
 			return { ...state, brush: { ...state.brush, ...action.brush } };
+		case "PUSH_RECENT_BRUSH": {
+			const next = [
+				{ ...state.brush },
+				...state.recentBrushes.filter(
+					(b) =>
+						!(
+							b.size === state.brush.size &&
+							b.hardness === state.brush.hardness &&
+							b.opacity === state.brush.opacity
+						),
+				),
+			].slice(0, 6);
+			return { ...state, recentBrushes: next };
+		}
+		case "SET_CLONE_SOURCE":
+			return { ...state, cloneSource: action.point };
 		case "SET_SHAPE":
 			return { ...state, shape: { ...state.shape, ...action.shape } };
 		case "SET_MARQUEE":
@@ -425,23 +463,48 @@ function reducer(state: EditorState, action: Action): EditorState {
 			return { ...state, renderTick: state.renderTick + 1 };
 		case "REQUEST_FIT_TO_SCREEN":
 			return { ...state, fitRequest: state.fitRequest + 1 };
-		case "LOAD_PROJECT":
+		case "LOAD_PROJECT": {
+			const view = "view" in action.state ? action.state.view : undefined;
 			return {
 				...state,
-				...action.state,
-				canvasBackground: state.canvasBackground ?? "#ffffff",
+				layers: action.state.layers,
+				canvasWidth: action.state.canvasWidth,
+				canvasHeight: action.state.canvasHeight,
+				activeLayerId: action.state.activeLayerId,
+				selection:
+					"selection" in action.state
+						? (action.state.selection ?? null)
+						: null,
+				selectionInverted:
+					"selectionInverted" in action.state
+						? Boolean(action.state.selectionInverted)
+						: false,
+				canvasBackground:
+					action.state.canvasBackground ?? state.canvasBackground ?? "#ffffff",
+				zoom: view?.zoom ?? state.zoom,
+				panX: view?.panX ?? state.panX,
+				panY: view?.panY ?? state.panY,
+				showGrid: view?.showGrid ?? state.showGrid,
+				showRulers: view?.showRulers ?? state.showRulers,
+				snapToGrid: view?.snapToGrid ?? state.snapToGrid,
+				gridSize: view?.gridSize ?? state.gridSize,
 				history: [
 					{
 						layers: action.state.layers.map(snapshotLayer),
 						canvasWidth: action.state.canvasWidth,
 						canvasHeight: action.state.canvasHeight,
 						description: "Open Project",
-						selection: null,
+						selection:
+							"selection" in action.state
+								? (action.state.selection ?? null)
+								: null,
 					},
 				],
 				historyIndex: 0,
 				renderTick: state.renderTick + 1,
+				fitRequest: view ? state.fitRequest : state.fitRequest + 1,
 			};
+		}
 		case "RESTORE_DRAFT": {
 			const entry: HistoryEntry = {
 				layers: action.layers.map(snapshotLayer),
@@ -494,6 +557,10 @@ function createInitialState(): EditorState {
 		gridSize: 20,
 		eyedropperSample: 1,
 		gradientAngle: 0,
+		gradient: {
+			...DEFAULT_GRADIENT,
+			stops: DEFAULT_GRADIENT.stops.map((s) => ({ ...s })),
+		},
 		fillOpacity: 100,
 		textUnderline: false,
 		textLineHeight: 120,
@@ -519,6 +586,8 @@ function createInitialState(): EditorState {
 		textItalic: false,
 		textAlign: "left",
 		recentColors: [],
+		recentBrushes: [],
+		cloneSource: null,
 		renderTick: 0,
 		fitRequest: 1,
 	};
@@ -542,6 +611,10 @@ interface EditorContextValue {
 	updateActiveLayerCanvas: (
 		fn: (ctx: CanvasRenderingContext2D) => void,
 	) => void;
+	runActiveLayerImageOp: (
+		payload: import("@/lib/canvas/imageOpsCore").ImageOpPayload,
+		label: string,
+	) => Promise<void>;
 	addLayer: (options?: AddLayerOptions) => Layer;
 	rotateActiveLayer: (deltaDegrees: number) => void;
 	setActiveLayerRotation: (degrees: number) => void;
@@ -628,6 +701,25 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 			fn(ctx);
 			if (layer.type === "text" && layer.textData) renderTextLayer(layer);
 			dispatch({ type: "BUMP_RENDER" });
+		},
+		[state.layers, state.activeLayerId],
+	);
+
+	const runActiveLayerImageOp = useCallback(
+		async (
+			payload: import("@/lib/canvas/imageOpsCore").ImageOpPayload,
+			label: string,
+		) => {
+			const layer = state.layers.find((l) => l.id === state.activeLayerId);
+			if (!layer || layer.locked) return;
+			const ctx = layer.canvas.getContext("2d");
+			if (!ctx) return;
+			const { runImageOpOnCanvas } = await import(
+				"@/lib/canvas/imageOpsWorker"
+			);
+			await runImageOpOnCanvas(ctx, payload);
+			dispatch({ type: "BUMP_RENDER" });
+			dispatch({ type: "PUSH_HISTORY", description: label });
 		},
 		[state.layers, state.activeLayerId],
 	);
@@ -740,6 +832,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 			activeLayer,
 			commitHistory,
 			updateActiveLayerCanvas,
+			runActiveLayerImageOp,
 			addLayer,
 			rotateActiveLayer,
 			setActiveLayerRotation,
@@ -751,6 +844,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
 			activeLayer,
 			commitHistory,
 			updateActiveLayerCanvas,
+			runActiveLayerImageOp,
 			addLayer,
 			rotateActiveLayer,
 			setActiveLayerRotation,

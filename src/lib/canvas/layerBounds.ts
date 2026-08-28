@@ -7,19 +7,25 @@ export function getLayerCenter(layer: Layer): { x: number; y: number } {
 	};
 }
 
-/** Corners of the layer bounds in document space (rotation applied). */
+function scaledHalf(layer: Layer) {
+	return {
+		hw: (layer.canvas.width * (layer.scaleX ?? 1)) / 2,
+		hh: (layer.canvas.height * (layer.scaleY ?? 1)) / 2,
+	};
+}
+
+/** Corners of the layer bounds in document space (rotation + scale applied). */
 export function getLayerCorners(layer: Layer): { x: number; y: number }[] {
-	const w = layer.canvas.width;
-	const h = layer.canvas.height;
 	const rot = ((layer.rotation ?? 0) * Math.PI) / 180;
 	const { x: cx, y: cy } = getLayerCenter(layer);
+	const { hw, hh } = scaledHalf(layer);
 	const cos = Math.cos(rot);
 	const sin = Math.sin(rot);
 	const local = [
-		{ x: -w / 2, y: -h / 2 },
-		{ x: w / 2, y: -h / 2 },
-		{ x: w / 2, y: h / 2 },
-		{ x: -w / 2, y: h / 2 },
+		{ x: -hw, y: -hh },
+		{ x: hw, y: -hh },
+		{ x: hw, y: hh },
+		{ x: -hw, y: hh },
 	];
 	return local.map((p) => ({
 		x: cx + p.x * cos - p.y * sin,
@@ -60,9 +66,11 @@ export function docToLayerLocal(
 	const { x: cx, y: cy } = getLayerCenter(layer);
 	const dx = docX - cx;
 	const dy = docY - cy;
+	const scaleX = layer.scaleX ?? 1;
+	const scaleY = layer.scaleY ?? 1;
 	return {
-		x: dx * Math.cos(rot) - dy * Math.sin(rot),
-		y: dx * Math.sin(rot) + dy * Math.cos(rot),
+		x: (dx * Math.cos(rot) - dy * Math.sin(rot)) / (scaleX || 1),
+		y: (dx * Math.sin(rot) + dy * Math.cos(rot)) / (scaleY || 1),
 	};
 }
 
@@ -135,4 +143,25 @@ export function isNearRotateHandle(
 ): boolean {
 	const h = getRotateHandlePosition(layer);
 	return Math.hypot(docX - h.x, docY - h.y) <= threshold;
+}
+
+/** Corner index 0=TL 1=TR 2=BR 3=BL, or null if none. */
+export function findNearScaleHandle(
+	layer: Layer,
+	docX: number,
+	docY: number,
+	threshold = 12,
+): number | null {
+	const corners = getLayerCorners(layer);
+	let best: number | null = null;
+	let bestDist = threshold;
+	for (let i = 0; i < corners.length; i++) {
+		const c = corners[i]!;
+		const d = Math.hypot(docX - c.x, docY - c.y);
+		if (d <= bestDist) {
+			bestDist = d;
+			best = i;
+		}
+	}
+	return best;
 }

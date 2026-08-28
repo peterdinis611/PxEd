@@ -88,15 +88,28 @@ function paintDab(
 	ctx.fill();
 }
 
+/** Map pointer pressure (0–1) to a size/opacity multiplier. Mouse = full. */
+export function pressureMultiplier(
+	pressure: number,
+	pointerType: string,
+): number {
+	if (pointerType === "mouse" || pointerType === "") return 1;
+	const p = pressure > 0 ? pressure : 0.5;
+	return Math.min(1, Math.max(0.12, p));
+}
+
 export function brushOptionsFromState(
 	brush: BrushSettings,
 	foregroundColor: string,
 	tool: "brush" | "pencil" | "eraser",
+	pressure = 1,
 ): StrokeOptions {
+	const p = Math.min(1, Math.max(0.05, pressure));
+	const sizeBase = tool === "pencil" ? Math.max(1, brush.size) : brush.size;
 	return {
-		size: tool === "pencil" ? Math.max(1, brush.size) : brush.size,
+		size: tool === "pencil" ? sizeBase : sizeBase * (0.2 + 0.8 * p),
 		hardness: tool === "pencil" ? 100 : brush.hardness,
-		opacity: brush.opacity,
+		opacity: brush.opacity * (0.35 + 0.65 * p),
 		flow: brush.flow,
 		spacing: tool === "pencil" ? 100 : brush.spacing,
 		color: foregroundColor,

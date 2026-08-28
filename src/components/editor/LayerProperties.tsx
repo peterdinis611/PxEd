@@ -13,8 +13,10 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useEditor } from "@/context/EditorContext";
 import { isDocumentBackdropLayer } from "@/lib/canvas/layerBounds";
+import { renderShapeLayer } from "@/lib/canvas/layers";
 import { snapCoord } from "@/lib/canvas/snap";
-import type { BlendMode } from "@/types/editor";
+import { ensureLayerMask } from "@/lib/canvas/transform";
+import type { BlendMode, ShapeData } from "@/types/editor";
 
 const BLEND_MODES: BlendMode[] = [
 	"normal",
@@ -202,10 +204,175 @@ export function LayerProperties() {
 					</SelectContent>
 				</Select>
 			</div>
+
+			<div className="mt-1.5 flex flex-wrap gap-1">
+				<Button
+					type="button"
+					size="sm"
+					variant={active.mask ? "secondary" : "outline"}
+					className="h-6 px-2 text-[10px]"
+					disabled={active.locked}
+					onClick={() => {
+						if (active.mask) {
+							dispatch({
+								type: "UPDATE_LAYER",
+								id: active.id,
+								patch: { mask: undefined, maskEditing: false },
+							});
+							commitHistory("Remove Mask");
+						} else {
+							const withMask = ensureLayerMask(active);
+							dispatch({
+								type: "UPDATE_LAYER",
+								id: active.id,
+								patch: { mask: withMask.mask, maskEditing: true },
+							});
+							commitHistory("Add Mask");
+						}
+					}}
+				>
+					{active.mask ? "Remove mask" : "Add mask"}
+				</Button>
+				{active.mask ? (
+					<Button
+						type="button"
+						size="sm"
+						variant={active.maskEditing ? "secondary" : "ghost"}
+						className="h-6 px-2 text-[10px]"
+						onClick={() =>
+							dispatch({
+								type: "UPDATE_LAYER",
+								id: active.id,
+								patch: { maskEditing: !active.maskEditing },
+							})
+						}
+					>
+						{active.maskEditing ? "Editing mask" : "Edit mask"}
+					</Button>
+				) : null}
+			</div>
 		</section>
+		{active.type === "shape" && active.shapeData ? (
+			<section className="sidebar-section shrink-0 border-t border-zinc-800 px-2 py-1.5">
+				<p className="mb-1 text-ui-xs font-semibold uppercase tracking-wide text-zinc-600">
+					Shape
+				</p>
+				<div className="grid grid-cols-2 gap-1.5">
+					<div>
+						<Label className="text-ui-xs text-zinc-600">Stroke</Label>
+						<input
+							type="color"
+							className="mt-0.5 h-7 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"
+							value={active.shapeData.strokeColor}
+							disabled={active.locked}
+							onChange={(e) =>
+								patchShape(active.id, active.shapeData!, {
+									strokeColor: e.target.value,
+								})
+							}
+						/>
+					</div>
+					<div>
+						<Label className="text-ui-xs text-zinc-600">Fill</Label>
+						<input
+							type="color"
+							className="mt-0.5 h-7 w-full cursor-pointer rounded border border-zinc-700 bg-transparent"
+							value={active.shapeData.fillColor}
+							disabled={active.locked}
+							onChange={(e) =>
+								patchShape(active.id, active.shapeData!, {
+									fillColor: e.target.value,
+								})
+							}
+						/>
+					</div>
+				</div>
+				<div className="mt-1.5 flex items-center gap-2">
+					<Label className="w-12 shrink-0 text-ui-xs text-zinc-600">Width</Label>
+					<Slider
+						size="lg"
+						value={[active.shapeData.strokeWidth]}
+						min={1}
+						max={64}
+						className="flex-1"
+						disabled={active.locked}
+						onValueChange={([v]) =>
+							patchShape(
+								active.id,
+								active.shapeData!,
+								{ strokeWidth: v! },
+								false,
+							)
+						}
+						onValueCommit={([v]) =>
+							patchShape(active.id, active.shapeData!, {
+								strokeWidth: v!,
+							})
+						}
+					/>
+					<span className="w-6 text-right text-ui-xs tabular-nums text-zinc-500">
+						{active.shapeData.strokeWidth}
+					</span>
+				</div>
+				<div className="mt-1.5 flex flex-wrap gap-1">
+					<Button
+						type="button"
+						size="sm"
+						variant={active.shapeData.filled ? "secondary" : "outline"}
+						className="h-6 px-2 text-[10px]"
+						disabled={active.locked}
+						onClick={() =>
+							patchShape(active.id, active.shapeData!, {
+								filled: !active.shapeData!.filled,
+							})
+						}
+					>
+						Filled
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						className="h-6 px-2 text-[10px]"
+						disabled={active.locked}
+						onClick={() => {
+							dispatch({
+								type: "UPDATE_LAYER",
+								id: active.id,
+								patch: { type: "pixel", shapeData: undefined },
+							});
+							commitHistory("Rasterize Shape");
+						}}
+					>
+						Rasterize
+					</Button>
+				</div>
+			</section>
+		) : null}
 		{active.sourceMetadata ? (
 			<ImageMetadataPanel metadata={active.sourceMetadata} />
 		) : null}
 		</>
 	);
+
+	function patchShape(
+		id: string,
+		current: ShapeData,
+		patch: Partial<ShapeData>,
+		pushHistory = true,
+	) {
+		const layer = state.layers.find((l) => l.id === id);
+		if (!layer || layer.locked) return;
+		const shapeData = { ...current, ...patch };
+		layer.shapeData = shapeData;
+		layer.type = "shape";
+		renderShapeLayer(layer);
+		dispatch({
+			type: "UPDATE_LAYER",
+			id,
+			patch: { shapeData },
+		});
+		dispatch({ type: "BUMP_RENDER" });
+		if (pushHistory) commitHistory("Edit Shape");
+	}
 }

@@ -111,6 +111,7 @@ export function installCanvasPolyfill(): void {
 				translateY += dy;
 			},
 			rotate() {},
+			scale() {},
 			fillRect(x: number, y: number, w: number, h: number) {
 				const img = ensureSize(el);
 				const [r, g, b, a] = parseColor(fillStyle);

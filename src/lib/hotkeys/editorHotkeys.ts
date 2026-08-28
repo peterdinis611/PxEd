@@ -15,6 +15,7 @@ const TOOL_KEYS: Record<string, ToolName> = {
 	b: "brush",
 	p: "pencil",
 	e: "eraser",
+	s: "clone-stamp",
 	g: "fill",
 	i: "eyedropper",
 	t: "text",

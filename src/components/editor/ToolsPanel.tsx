@@ -46,7 +46,7 @@ const TOOL_GROUPS: { label: string; tools: ToolDef[] }[] = [
 				id: "move",
 				icon: <MousePointer2 className={ICON} />,
 				label: "Move",
-				description: "Moves the active layer on the canvas.",
+				description: "Moves, scales (corners), and rotates the active layer.",
 				key: "V",
 			},
 			{
@@ -140,6 +140,13 @@ const TOOL_GROUPS: { label: string; tools: ToolDef[] }[] = [
 				label: "Eraser",
 				description: "Erases pixels on the active layer.",
 				key: "E",
+			},
+			{
+				id: "clone-stamp",
+				icon: <Hexagon className={ICON} />,
+				label: "Clone Stamp",
+				description: "Alt+click to set source, then paint to clone pixels.",
+				key: "S",
 			},
 			{
 				id: "fill",

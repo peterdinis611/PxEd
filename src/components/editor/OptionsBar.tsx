@@ -14,7 +14,7 @@ import { useEditor } from "@/context/EditorContext";
 import { snapCoord } from "@/lib/canvas/snap";
 import { fadeSlideRight } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import type { ToolName } from "@/types/editor";
+import { BRUSH_PRESETS, type ToolName } from "@/types/editor";
 
 function SliderControl({
 	label,
@@ -109,6 +109,7 @@ const TOOL_LABELS: Record<ToolName, string> = {
 	brush: "Brush",
 	pencil: "Pencil",
 	eraser: "Eraser",
+	"clone-stamp": "Clone Stamp",
 	fill: "Paint Bucket",
 	gradient: "Gradient",
 	eyedropper: "Eyedropper",
@@ -141,6 +142,7 @@ export function OptionsBar() {
 		patch: Partial<{
 			eyedropperSample: number;
 			gradientAngle: number;
+			gradient: typeof state.gradient;
 			fillOpacity: number;
 			contiguousWand: boolean;
 			textUnderline: boolean;
@@ -226,81 +228,151 @@ export function OptionsBar() {
 					<motion.div key={tool} className="min-w-0 flex-1" {...fadeSlideRight}>
 						{(tool === "brush" || tool === "pencil") && (
 							<div className="flex min-w-0 flex-1 flex-col gap-1">
-								<OptionsStrip>
-									<SliderControl
-										label="Size"
-										value={brush.size}
-										min={1}
-										max={500}
-										onChange={(size) => setBrush({ size })}
-									/>
-									<SliderControl
-										label="Hardness"
-										value={brush.hardness}
-										min={0}
-										max={100}
-										onChange={(hardness) => setBrush({ hardness })}
-									/>
-									<SliderControl
-										label="Opacity"
-										value={brush.opacity}
-										min={1}
-										max={100}
-										onChange={(opacity) => setBrush({ opacity })}
-									/>
-									<SliderControl
-										label="Flow"
-										value={brush.flow}
-										min={1}
-										max={100}
-										onChange={(flow) => setBrush({ flow })}
-									/>
-								</OptionsStrip>
-								<OptionsStrip>
-									<SliderControl
-										label="Spacing"
-										value={brush.spacing}
-										min={1}
-										max={100}
-										onChange={(spacing) => setBrush({ spacing })}
-									/>
-									<SliderControl
-										label="Smooth"
-										value={brush.smoothing}
-										min={0}
-										max={100}
-										onChange={(smoothing) => setBrush({ smoothing })}
-									/>
-									<Select
-										value={brush.blendMode}
-										onValueChange={(v) =>
-											setBrush({ blendMode: v as typeof brush.blendMode })
-										}
-									>
-										<SelectTrigger className="h-7 w-[7.5rem] text-ui-xs capitalize">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{[
-												"source-over",
-												"multiply",
-												"screen",
-												"overlay",
-												"darken",
-												"lighten",
-											].map((m) => (
-												<SelectItem
-													key={m}
-													value={m}
-													className="text-ui-xs capitalize"
-												>
-													{m}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</OptionsStrip>
+								<div className="flex flex-wrap items-center gap-1">
+									<span className="text-[10px] uppercase tracking-wide text-zinc-600">
+										Presets
+									</span>
+									{BRUSH_PRESETS.map((preset) => (
+										<button
+											key={preset.id}
+											type="button"
+											className="h-6 rounded border border-zinc-700 bg-zinc-800/80 px-2 text-[10px] text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
+											onClick={() => {
+												setBrush(preset.brush);
+												dispatch({ type: "PUSH_RECENT_BRUSH" });
+											}}
+										>
+											{preset.name}
+										</button>
+									))}
+									{state.recentBrushes.slice(0, 3).map((b, i) => (
+										<button
+											key={`recent-${i}-${b.size}-${b.hardness}`}
+											type="button"
+											title={`Size ${b.size} · Hard ${b.hardness}`}
+											className="h-6 rounded border border-zinc-700/80 px-2 font-mono text-[10px] text-zinc-400 hover:text-zinc-200"
+											onClick={() => setBrush(b)}
+										>
+											{b.size}px
+										</button>
+									))}
+								</div>
+								<details open className="group">
+									<summary className="cursor-pointer select-none text-[10px] uppercase tracking-wide text-zinc-600 hover:text-zinc-400">
+										Stroke
+									</summary>
+									<OptionsStrip>
+										<SliderControl
+											label="Size"
+											value={brush.size}
+											min={1}
+											max={500}
+											onChange={(size) => setBrush({ size })}
+										/>
+										<SliderControl
+											label="Hardness"
+											value={brush.hardness}
+											min={0}
+											max={100}
+											onChange={(hardness) => setBrush({ hardness })}
+										/>
+										<SliderControl
+											label="Opacity"
+											value={brush.opacity}
+											min={1}
+											max={100}
+											onChange={(opacity) => setBrush({ opacity })}
+										/>
+										<SliderControl
+											label="Flow"
+											value={brush.flow}
+											min={1}
+											max={100}
+											onChange={(flow) => setBrush({ flow })}
+										/>
+									</OptionsStrip>
+								</details>
+								<details className="group">
+									<summary className="cursor-pointer select-none text-[10px] uppercase tracking-wide text-zinc-600 hover:text-zinc-400">
+										Advanced
+									</summary>
+									<OptionsStrip>
+										<SliderControl
+											label="Spacing"
+											value={brush.spacing}
+											min={1}
+											max={100}
+											onChange={(spacing) => setBrush({ spacing })}
+										/>
+										<SliderControl
+											label="Smooth"
+											value={brush.smoothing}
+											min={0}
+											max={100}
+											onChange={(smoothing) => setBrush({ smoothing })}
+										/>
+										<Select
+											value={brush.blendMode}
+											onValueChange={(v) =>
+												setBrush({ blendMode: v as typeof brush.blendMode })
+											}
+										>
+											<SelectTrigger className="h-7 w-[7.5rem] text-ui-xs capitalize">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												{[
+													"source-over",
+													"multiply",
+													"screen",
+													"overlay",
+													"darken",
+													"lighten",
+												].map((m) => (
+													<SelectItem
+														key={m}
+														value={m}
+														className="text-ui-xs capitalize"
+													>
+														{m}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</OptionsStrip>
+								</details>
 							</div>
+						)}
+
+						{tool === "clone-stamp" && (
+							<OptionsStrip>
+								<span className="text-ui-xs text-zinc-500">
+									{state.cloneSource
+										? `Source ${Math.round(state.cloneSource.x)}, ${Math.round(state.cloneSource.y)}`
+										: "Alt+click to set source"}
+								</span>
+								<SliderControl
+									label="Size"
+									value={brush.size}
+									min={1}
+									max={500}
+									onChange={(size) => setBrush({ size })}
+								/>
+								<SliderControl
+									label="Hardness"
+									value={brush.hardness}
+									min={0}
+									max={100}
+									onChange={(hardness) => setBrush({ hardness })}
+								/>
+								<SliderControl
+									label="Opacity"
+									value={brush.opacity}
+									min={1}
+									max={100}
+									onChange={(opacity) => setBrush({ opacity })}
+								/>
+							</OptionsStrip>
 						)}
 
 						{tool === "eraser" && (
@@ -556,14 +628,94 @@ export function OptionsBar() {
 
 						{tool === "gradient" && (
 							<OptionsStrip>
-								<SliderControl
-									label="Angle"
-									value={state.gradientAngle}
-									min={0}
-									max={360}
-									onChange={(gradientAngle) => setMisc({ gradientAngle })}
-								/>
-								<span className="text-ui-xs text-zinc-500">Drag · FG → BG</span>
+								<ToggleBtn
+									active={state.gradient.type === "linear"}
+									onClick={() =>
+										setMisc({
+											gradient: { ...state.gradient, type: "linear" },
+										})
+									}
+								>
+									Linear
+								</ToggleBtn>
+								<ToggleBtn
+									active={state.gradient.type === "radial"}
+									onClick={() =>
+										setMisc({
+											gradient: { ...state.gradient, type: "radial" },
+										})
+									}
+								>
+									Radial
+								</ToggleBtn>
+								{state.gradient.stops.map((stop, i) => (
+									<div key={i} className="flex items-center gap-1">
+										<input
+											type="color"
+											className="h-6 w-7 cursor-pointer rounded border border-zinc-700 bg-transparent"
+											value={stop.color}
+											onChange={(e) => {
+												const stops = state.gradient.stops.map((s, j) =>
+													j === i ? { ...s, color: e.target.value } : s,
+												);
+												setMisc({ gradient: { ...state.gradient, stops } });
+											}}
+										/>
+										<input
+											type="number"
+											className="field-num w-10"
+											min={0}
+											max={100}
+											value={Math.round(stop.offset * 100)}
+											onChange={(e) => {
+												const offset = Math.min(
+													1,
+													Math.max(0, +e.target.value / 100),
+												);
+												const stops = state.gradient.stops.map((s, j) =>
+													j === i ? { ...s, offset } : s,
+												);
+												setMisc({ gradient: { ...state.gradient, stops } });
+											}}
+										/>
+										{state.gradient.stops.length > 2 && (
+											<button
+												type="button"
+												className="text-ui-xs text-zinc-500 hover:text-red-400"
+												onClick={() => {
+													const stops = state.gradient.stops.filter(
+														(_, j) => j !== i,
+													);
+													setMisc({
+														gradient: { ...state.gradient, stops },
+													});
+												}}
+											>
+												×
+											</button>
+										)}
+									</div>
+								))}
+								{state.gradient.stops.length < 6 && (
+									<Button
+										size="sm"
+										variant="ghost"
+										className="h-7 px-2 text-ui-xs"
+										onClick={() => {
+											const mid = {
+												offset: 0.5,
+												color: state.foregroundColor,
+											};
+											const stops = [...state.gradient.stops, mid].sort(
+												(a, b) => a.offset - b.offset,
+											);
+											setMisc({ gradient: { ...state.gradient, stops } });
+										}}
+									>
+										+ Stop
+									</Button>
+								)}
+								<span className="text-ui-xs text-zinc-500">Drag on canvas</span>
 							</OptionsStrip>
 						)}
 

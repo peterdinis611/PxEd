@@ -26,6 +26,7 @@ export type ToolName =
 	| "brush"
 	| "pencil"
 	| "eraser"
+	| "clone-stamp"
 	| "fill"
 	| "gradient"
 	| "eyedropper"
@@ -51,6 +52,31 @@ export interface TextData {
 	lineHeight?: number;
 }
 
+export interface ShapeData {
+	kind: "rect" | "ellipse" | "line" | "arrow";
+	x0: number;
+	y0: number;
+	x1: number;
+	y1: number;
+	fillColor: string;
+	strokeColor: string;
+	strokeWidth: number;
+	filled: boolean;
+	cornerRadius: number;
+	lineCap: CanvasLineCap;
+	lineJoin: CanvasLineJoin;
+}
+
+export interface GradientStop {
+	offset: number;
+	color: string;
+}
+
+export interface GradientSettings {
+	type: "linear" | "radial";
+	stops: GradientStop[];
+}
+
 export interface Layer {
 	id: string;
 	name: string;
@@ -63,8 +89,16 @@ export interface Layer {
 	y: number;
 	/** Rotation in degrees around the layer center. */
 	rotation: number;
+	/** Uniform-ish scale around the layer center. Defaults to 1. */
+	scaleX: number;
+	scaleY: number;
+	/** Optional grayscale alpha mask (same size as canvas). White = visible. */
+	mask?: HTMLCanvasElement;
+	/** When true, brush/eraser paints on the mask instead of pixels. */
+	maskEditing?: boolean;
 	type: "pixel" | "text" | "shape";
 	textData?: TextData;
+	shapeData?: ShapeData;
 	/** Populated when the layer was imported from a raster file. */
 	sourceMetadata?: ImageSourceMetadata;
 }
@@ -105,8 +139,13 @@ export interface LayerSnapshot {
 	x: number;
 	y: number;
 	rotation: number;
+	scaleX: number;
+	scaleY: number;
+	maskImageData?: ImageData;
+	maskEditing?: boolean;
 	type: "pixel" | "text" | "shape";
 	textData?: TextData;
+	shapeData?: ShapeData;
 	sourceMetadata?: ImageSourceMetadata;
 }
 
@@ -184,6 +223,20 @@ export const DEFAULT_BRUSH: BrushSettings = {
 	smoothing: 50,
 };
 
+export interface BrushPreset {
+	id: string;
+	name: string;
+	brush: Partial<BrushSettings>;
+}
+
+export const BRUSH_PRESETS: BrushPreset[] = [
+	{ id: "fine", name: "Fine", brush: { size: 4, hardness: 100, opacity: 100, flow: 100 } },
+	{ id: "soft", name: "Soft", brush: { size: 24, hardness: 30, opacity: 70, flow: 80 } },
+	{ id: "ink", name: "Ink", brush: { size: 8, hardness: 95, opacity: 100, flow: 100 } },
+	{ id: "air", name: "Airbrush", brush: { size: 48, hardness: 10, opacity: 40, flow: 50 } },
+	{ id: "marker", name: "Marker", brush: { size: 18, hardness: 85, opacity: 90, flow: 100 } },
+];
+
 export const DEFAULT_SHAPE: ShapeSettings = {
 	fillColor: "#000000",
 	strokeColor: "#000000",
@@ -200,4 +253,12 @@ export const DEFAULT_MARQUEE: MarqueeSettings = {
 	fixedRatio: false,
 	ratioW: 1,
 	ratioH: 1,
+};
+
+export const DEFAULT_GRADIENT: GradientSettings = {
+	type: "linear",
+	stops: [
+		{ offset: 0, color: "#000000" },
+		{ offset: 1, color: "#ffffff" },
+	],
 };

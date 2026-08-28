@@ -20,11 +20,11 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { useEditor } from "@/context/EditorContext";
-import { grayscale, invertColors } from "@/lib/canvas/adjustments";
 import {
 	exportFlattenedPng,
 	exportJpeg,
 	exportProjectJson,
+	exportSelectionPng,
 	exportWebp,
 	parseProjectJson,
 	restoreProject,
@@ -35,6 +35,7 @@ import {
 	formatMegapixels,
 	getDocumentProfile,
 } from "@/lib/canvas/documentLimits";
+import type { ImageOpPayload } from "@/lib/canvas/imageOpsCore";
 import {
 	drawImageWithExifOrientation,
 	extractImageMetadata,
@@ -43,13 +44,6 @@ import {
 	normalizeExifOrientation,
 } from "@/lib/image/metadata";
 import { toast } from "@/lib/toast";
-import {
-	addNoise,
-	emboss,
-	gaussianBlur,
-	pixelate,
-	sharpen,
-} from "@/lib/canvas/filters";
 import { createLayer } from "@/lib/canvas/layers";
 import { canInvertSelection } from "@/lib/canvas/selection";
 import type { ToolName } from "@/types/editor";
@@ -132,7 +126,7 @@ export function MenuBar({
 		state,
 		dispatch,
 		commitHistory,
-		updateActiveLayerCanvas,
+		runActiveLayerImageOp,
 		addLayer,
 		rotateActiveLayer,
 		bakeActiveLayerRotation,
@@ -168,12 +162,8 @@ export function MenuBar({
 	const canPaste = !!state.clipboard && !!activeLayer;
 	const hasSelection = !!state.selection;
 
-	const applyFilter = (
-		fn: (ctx: CanvasRenderingContext2D) => void,
-		name: string,
-	) => {
-		updateActiveLayerCanvas(fn);
-		commitHistory(name);
+	const applyFilter = (payload: ImageOpPayload, name: string) => {
+		void runActiveLayerImageOp(payload, name);
 		setFilterOpen(null);
 	};
 
@@ -295,6 +285,26 @@ export function MenuBar({
 				},
 				{
 					type: "item",
+					label: "Export Selection as PNG",
+					disabled: !state.selection,
+					action: () => {
+						try {
+							const ok = exportSelectionPng(
+								state.layers,
+								state.canvasWidth,
+								state.canvasHeight,
+								state.selection,
+								state.canvasBackground,
+							);
+							if (ok) toast.exportSaved("selection.png");
+							else toast.error("No selection to export");
+						} catch {
+							toast.error("Selection export failed");
+						}
+					},
+				},
+				{
+					type: "item",
 					label: "Save as JPEG...",
 					action: () => setJpegOpen(true),
 				},
@@ -309,12 +319,24 @@ export function MenuBar({
 					label: "Export Project (JSON)...",
 					action: () => {
 						try {
-							exportProjectJson(
-								state.layers,
-								state.canvasWidth,
-								state.canvasHeight,
-								state.activeLayerId,
-							);
+							exportProjectJson({
+								layers: state.layers,
+								canvasWidth: state.canvasWidth,
+								canvasHeight: state.canvasHeight,
+								activeLayerId: state.activeLayerId,
+								selection: state.selection,
+								selectionInverted: state.selectionInverted,
+								view: {
+									zoom: state.zoom,
+									panX: state.panX,
+									panY: state.panY,
+									showGrid: state.showGrid,
+									showRulers: state.showRulers,
+									snapToGrid: state.snapToGrid,
+									gridSize: state.gridSize,
+								},
+								canvasBackground: state.canvasBackground,
+							});
 							toast.exportSaved("project.pxed.json");
 						} catch {
 							toast.error("Project export failed");
@@ -561,7 +583,7 @@ export function MenuBar({
 				{
 					type: "item",
 					label: "Sharpen",
-					action: () => applyFilter(sharpen, "Sharpen"),
+					action: () => applyFilter({ op: "sharpen" }, "Sharpen"),
 				},
 				{
 					type: "item",
@@ -582,18 +604,18 @@ export function MenuBar({
 				{
 					type: "item",
 					label: "Emboss",
-					action: () => applyFilter(emboss, "Emboss"),
+					action: () => applyFilter({ op: "emboss" }, "Emboss"),
 				},
 				{ type: "separator" },
 				{
 					type: "item",
 					label: "Grayscale",
-					action: () => applyFilter(grayscale, "Grayscale"),
+					action: () => applyFilter({ op: "grayscale" }, "Grayscale"),
 				},
 				{
 					type: "item",
 					label: "Invert Colors",
-					action: () => applyFilter(invertColors, "Invert"),
+					action: () => applyFilter({ op: "invert" }, "Invert"),
 				},
 			],
 		},
@@ -1209,13 +1231,16 @@ export function MenuBar({
 						onClick={() => {
 							if (filterOpen === "blur")
 								applyFilter(
-									(ctx) => gaussianBlur(ctx, filterVal),
+									{ op: "blur", radius: filterVal },
 									"Gaussian Blur",
 								);
 							else if (filterOpen === "noise")
-								applyFilter((ctx) => addNoise(ctx, filterVal), "Noise");
+								applyFilter({ op: "noise", amount: filterVal }, "Noise");
 							else if (filterOpen === "pixelate")
-								applyFilter((ctx) => pixelate(ctx, filterVal), "Pixelate");
+								applyFilter(
+									{ op: "pixelate", cellSize: filterVal },
+									"Pixelate",
+								);
 						}}
 					>
 						Apply

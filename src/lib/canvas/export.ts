@@ -3,8 +3,9 @@ import {
 	restoreLayerFromSnapshot,
 	snapshotLayer,
 } from "@/lib/canvas/layers";
+import { selectionBounds } from "@/lib/canvas/selection";
 import { drawLayerWithTransform } from "@/lib/canvas/transform";
-import type { Layer, LayerSnapshot } from "@/types/editor";
+import type { Layer, LayerSnapshot, Selection } from "@/types/editor";
 
 function flattenToCanvas(
 	layers: Layer[],
@@ -69,6 +70,32 @@ export function exportWebp(
 	link.click();
 }
 
+/** Export only the current selection (bounding box) as PNG. */
+export function exportSelectionPng(
+	layers: Layer[],
+	width: number,
+	height: number,
+	selection: Selection | null,
+	background = "#ffffff",
+): boolean {
+	const bounds = selectionBounds(selection);
+	if (!bounds || bounds.width < 1 || bounds.height < 1) return false;
+
+	const full = flattenToCanvas(layers, width, height, background);
+	const x = Math.max(0, Math.floor(bounds.x));
+	const y = Math.max(0, Math.floor(bounds.y));
+	const w = Math.min(Math.ceil(bounds.width), width - x);
+	const h = Math.min(Math.ceil(bounds.height), height - y);
+	if (w < 1 || h < 1) return false;
+
+	const crop = document.createElement("canvas");
+	crop.width = w;
+	crop.height = h;
+	crop.getContext("2d")!.drawImage(full, x, y, w, h, 0, 0, w, h);
+	downloadCanvas(crop, "selection.png");
+	return true;
+}
+
 function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 	const link = document.createElement("a");
 	link.download = filename;
@@ -76,26 +103,52 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 	link.click();
 }
 
+export interface ProjectViewState {
+	zoom: number;
+	panX: number;
+	panY: number;
+	showGrid: boolean;
+	showRulers: boolean;
+	snapToGrid: boolean;
+	gridSize: number;
+}
+
+/** Project file — v2 adds selection + view chrome. */
 export interface ProjectJson {
-	version: 1;
+	version: 1 | 2;
 	canvasWidth: number;
 	canvasHeight: number;
 	layers: LayerSnapshot[];
 	activeLayerId: string | null;
+	/** v2 */
+	selection?: Selection | null;
+	selectionInverted?: boolean;
+	view?: ProjectViewState;
+	canvasBackground?: string;
 }
 
-export function exportProjectJson(
-	layers: Layer[],
-	canvasWidth: number,
-	canvasHeight: number,
-	activeLayerId: string | null,
-): void {
+export type ProjectExportInput = {
+	layers: Layer[];
+	canvasWidth: number;
+	canvasHeight: number;
+	activeLayerId: string | null;
+	selection: Selection | null;
+	selectionInverted: boolean;
+	view: ProjectViewState;
+	canvasBackground: string;
+};
+
+export function exportProjectJson(input: ProjectExportInput): void {
 	const data: ProjectJson = {
-		version: 1,
-		canvasWidth,
-		canvasHeight,
-		layers: layers.map(snapshotLayer),
-		activeLayerId,
+		version: 2,
+		canvasWidth: input.canvasWidth,
+		canvasHeight: input.canvasHeight,
+		layers: input.layers.map(snapshotLayer),
+		activeLayerId: input.activeLayerId,
+		selection: input.selection,
+		selectionInverted: input.selectionInverted,
+		view: input.view,
+		canvasBackground: input.canvasBackground,
 	};
 	const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
 	const url = URL.createObjectURL(blob);
@@ -110,6 +163,10 @@ export function parseProjectJson(json: string): ProjectJson {
 	const data = JSON.parse(json) as ProjectJson;
 	if (!data.layers || !data.canvasWidth)
 		throw new Error("Invalid project file");
+	if (data.version !== 1 && data.version !== 2) {
+		// Accept missing version as v1
+		data.version = 1;
+	}
 	return data;
 }
 
@@ -136,5 +193,10 @@ export function restoreProject(data: ProjectJson) {
 		canvasWidth: data.canvasWidth,
 		canvasHeight: data.canvasHeight,
 		activeLayerId: data.activeLayerId ?? layers[0]?.id ?? null,
+		selection: data.version === 2 ? (data.selection ?? null) : null,
+		selectionInverted:
+			data.version === 2 ? Boolean(data.selectionInverted) : false,
+		view: data.version === 2 ? data.view : undefined,
+		canvasBackground: data.canvasBackground,
 	};
 }

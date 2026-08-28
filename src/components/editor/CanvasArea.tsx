@@ -7,47 +7,61 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { BrushCursorPreview } from "@/components/editor/BrushCursorPreview";
 import { CanvasRulers } from "@/components/editor/CanvasRulers";
 import { EditorKonvaStage } from "@/components/editor/EditorKonvaStage";
+import { InlineTextEditor } from "@/components/editor/InlineTextEditor";
 import { LayerSelectionOverlay } from "@/components/editor/LayerSelectionOverlay";
 import { ShapeDrawPreviewOverlay } from "@/components/editor/ShapeDrawPreview";
+import { SnapGuidesOverlay } from "@/components/editor/SnapGuidesOverlay";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "@/context/EditorContext";
-import { brushOptionsFromState, drawBrushStroke } from "@/lib/canvas/brush";
+import {
+	brushOptionsFromState,
+	drawBrushStroke,
+	pressureMultiplier,
+} from "@/lib/canvas/brush";
+import { drawCloneStampStroke } from "@/lib/canvas/cloneStamp";
 import { screenToDoc } from "@/lib/canvas/composite";
+import { getDocumentProfile } from "@/lib/canvas/documentLimits";
 import { floodFill, magicWandSelect } from "@/lib/canvas/floodFill";
+import { createGradientFromDrag } from "@/lib/canvas/gradientFill";
 import {
 	findLayerAtPoint,
+	findNearScaleHandle,
 	getLayerCenter,
 	isDocumentBackdropLayer,
 	isNearRotateHandle,
 } from "@/lib/canvas/layerBounds";
-import { createLayer, renderTextLayer } from "@/lib/canvas/layers";
+import {
+	createLayer,
+	renderShapeLayer,
+	renderTextLayer,
+} from "@/lib/canvas/layers";
 import {
 	constrainRectToRatio,
 	normalizeRect,
 	withSelectionClip,
 } from "@/lib/canvas/selection";
-import { drawArrow } from "@/lib/canvas/shapes";
-import {
-	sampleColorAtDocPoint,
-	sampleRgbaAtDocPoint,
-} from "@/lib/canvas/sampleColor";
+import { sampleColorAtDocPoint, sampleRgbaAtDocPoint } from "@/lib/canvas/sampleColor";
 import { snapPoint } from "@/lib/canvas/snap";
+import { snapLayerMove, type SnapGuide } from "@/lib/canvas/snapGuides";
+import { ensureLayerMask } from "@/lib/canvas/transform";
 import {
 	computeFitViewport,
 	getViewportLayout,
 	type ViewportLayout,
 } from "@/lib/canvas/viewport";
-import type { Selection } from "@/types/editor";
+import type { Selection, ShapeData, TextData } from "@/types/editor";
 import type { ShapeDrawPreview } from "@/types/shapePreview";
 
 const CURSORS: Record<string, string> = {
 	move: "move",
 	hand: "grab",
-	brush: "crosshair",
-	pencil: "crosshair",
-	eraser: "crosshair",
+	brush: "none",
+	pencil: "none",
+	eraser: "none",
+	"clone-stamp": "none",
 	fill: "crosshair",
 	eyedropper: "crosshair",
 	text: "text",
@@ -81,8 +95,12 @@ export function CanvasArea({
 		setActiveLayerRotation,
 	} = useEditor();
 	const containerRef = useRef<HTMLDivElement>(null);
-	const stageRef = useRef<Konva.Stage>(null);
+	const stageRef = useRef<Konva.Stage | null>(null);
 	const [viewport, setViewport] = useState({ w: 0, h: 0 });
+	const [viewportBusy, setViewportBusy] = useState(false);
+	const viewportIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pressureRef = useRef(1);
+	const pointerTypeRef = useRef("mouse");
 	const layout: ViewportLayout =
 		viewport.w < 1 || viewport.h < 1
 			? {
@@ -125,6 +143,9 @@ export function CanvasArea({
 	const [shapeCommitFlash, setShapeCommitFlash] =
 		useState<ShapeDrawPreview | null>(null);
 	const [zoomHint, setZoomHint] = useState<number | null>(null);
+	const [textDraft, setTextDraft] = useState<TextData | null>(null);
+	const [snapGuides, setSnapGuides] = useState<SnapGuide[]>([]);
+	const [cursorDoc, setCursorDoc] = useState({ x: 0, y: 0 });
 	const zoomHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const polygonRef = useRef<{ points: { x: number; y: number }[] } | null>(
 		null,
@@ -135,6 +156,13 @@ export function CanvasArea({
 		startAngle: number;
 		startRotation: number;
 	} | null>(null);
+	const scaleDragRef = useRef<{
+		corner: number;
+		startDist: number;
+		startScaleX: number;
+		startScaleY: number;
+	} | null>(null);
+	const cloneAnchorRef = useRef<{ x: number; y: number } | null>(null);
 	const pendingMoveRef = useRef<{
 		layerId: string;
 		startX: number;
@@ -175,6 +203,27 @@ export function CanvasArea({
 		if (zoomHintTimer.current) clearTimeout(zoomHintTimer.current);
 		zoomHintTimer.current = setTimeout(() => setZoomHint(null), 1200);
 	}, []);
+
+	const markViewportBusy = useCallback(() => {
+		setViewportBusy(true);
+		if (viewportIdleTimer.current) clearTimeout(viewportIdleTimer.current);
+		viewportIdleTimer.current = setTimeout(() => {
+			setViewportBusy(false);
+			viewportIdleTimer.current = null;
+		}, 180);
+	}, []);
+
+	const updatePressure = (e: {
+		pressure: number;
+		pointerType: string;
+		buttons?: number;
+	}) => {
+		pointerTypeRef.current = e.pointerType;
+		pressureRef.current = pressureMultiplier(
+			e.pressure,
+			e.pointerType,
+		);
+	};
 
 	const updateViewportSize = useCallback(() => {
 		const el = containerRef.current;
@@ -284,7 +333,12 @@ export function CanvasArea({
 			y0,
 			x1,
 			y1,
-			brushOptionsFromState(state.brush, state.foregroundColor, tool),
+			brushOptionsFromState(
+				state.brush,
+				state.foregroundColor,
+				tool,
+				pressureRef.current,
+			),
 		);
 	};
 
@@ -307,8 +361,9 @@ export function CanvasArea({
 		return normalizeRect(x0, y0, x1, y1);
 	};
 
-	const startPan = (e: React.MouseEvent) => {
+	const startPan = (e: React.MouseEvent | React.PointerEvent) => {
 		e.preventDefault();
+		markViewportBusy();
 		const origin = { panX: state.panX, panY: state.panY };
 		dragRef.current = {
 			type: "pan",
@@ -321,6 +376,7 @@ export function CanvasArea({
 		const onPanMove = (ev: PointerEvent) => {
 			const d = dragRef.current;
 			if (!d || d.type !== "pan" || !d.panStart) return;
+			markViewportBusy();
 			dispatch({
 				type: "SET_PAN",
 				panX: d.panStart.panX + (ev.clientX - d.startX),
@@ -329,6 +385,7 @@ export function CanvasArea({
 		};
 		const onPanUp = () => {
 			if (dragRef.current?.type === "pan") dragRef.current = null;
+			markViewportBusy();
 			window.removeEventListener("pointermove", onPanMove);
 			window.removeEventListener("pointerup", onPanUp);
 		};
@@ -421,11 +478,52 @@ export function CanvasArea({
 				return;
 			}
 
+			const scaleCorner = findNearScaleHandle(
+				moveLayer,
+				x,
+				y,
+				12 / layoutRef.current.scale,
+			);
+			if (
+				scaleCorner !== null &&
+				!isDocumentBackdropLayer(
+					moveLayer,
+					state.canvasWidth,
+					state.canvasHeight,
+				)
+			) {
+				const c = getLayerCenter(moveLayer);
+				const dist = Math.hypot(x - c.x, y - c.y) || 1;
+				scaleDragRef.current = {
+					corner: scaleCorner,
+					startDist: dist,
+					startScaleX: moveLayer.scaleX ?? 1,
+					startScaleY: moveLayer.scaleY ?? 1,
+				};
+				return;
+			}
+
 			pendingMoveRef.current = {
 				layerId: moveLayer.id,
 				startX: x,
 				startY: y,
 				layerOffset: { x: moveLayer.x, y: moveLayer.y },
+			};
+			return;
+		}
+
+		if (
+			tool === "shape-rect" ||
+			tool === "shape-ellipse" ||
+			tool === "shape-line" ||
+			tool === "shape-arrow"
+		) {
+			dragRef.current = {
+				type: tool,
+				startX: x,
+				startY: y,
+				lastX: x,
+				lastY: y,
 			};
 			return;
 		}
@@ -461,10 +559,8 @@ export function CanvasArea({
 		}
 
 		if (tool === "text") {
-			const text = prompt("Enter text:", layer.textData?.text ?? "");
-			if (text === null) return;
-			const textData = {
-				text,
+			setTextDraft({
+				text: layer.textData?.text ?? "Text",
 				font: state.textFont,
 				size: state.textSize,
 				color: state.foregroundColor,
@@ -475,29 +571,24 @@ export function CanvasArea({
 				y: Math.floor(y),
 				underline: state.textUnderline,
 				lineHeight: state.textLineHeight,
-			};
-			if (layer.type !== "text") {
-				const newLayer = createLayer(
-					state.canvasWidth,
-					state.canvasHeight,
-					"Text",
-					{ type: "text", textData },
-				);
-				renderTextLayer(newLayer);
-				dispatch({
-					type: "SET_LAYERS",
-					layers: [...state.layers, newLayer],
-				});
-				dispatch({ type: "SET_ACTIVE_LAYER", id: newLayer.id });
-			} else {
-				dispatch({
-					type: "UPDATE_LAYER",
-					id: layer.id,
-					patch: { textData, type: "text" },
-				});
-				renderTextLayer({ ...layer, textData, type: "text" });
+			});
+			return;
+		}
+
+		if (tool === "clone-stamp") {
+			if (e.altKey) {
+				dispatch({ type: "SET_CLONE_SOURCE", point: { x, y } });
+				return;
 			}
-			commitHistory("Text");
+			if (!state.cloneSource) return;
+			cloneAnchorRef.current = { x, y };
+			dragRef.current = {
+				type: tool,
+				startX: x,
+				startY: y,
+				lastX: x,
+				lastY: y,
+			};
 			return;
 		}
 
@@ -514,7 +605,22 @@ export function CanvasArea({
 	const onMouseMove = (e: React.MouseEvent) => {
 		const raw = getDocPoint(e);
 		const { x, y } = snapPoint(raw.x, raw.y, state.gridSize, state.snapToGrid);
+		setCursorDoc({ x: raw.x, y: raw.y });
 		onCursorMove(raw.x, raw.y, sampleRgba(raw.x, raw.y));
+
+		if (scaleDragRef.current && activeLayer) {
+			const s = scaleDragRef.current;
+			const c = getLayerCenter(activeLayer);
+			const dist = Math.hypot(x - c.x, y - c.y) || 1;
+			const factor = dist / s.startDist;
+			const next = Math.max(0.05, Math.min(20, s.startScaleX * factor));
+			dispatch({
+				type: "UPDATE_LAYER",
+				id: activeLayer.id,
+				patch: { scaleX: next, scaleY: next },
+			});
+			return;
+		}
 
 		if (rotateDragRef.current && activeLayer) {
 			const r = rotateDragRef.current;
@@ -547,6 +653,7 @@ export function CanvasArea({
 				const pts = polygonRef.current.points;
 				setPreviewSel({ type: "lasso", points: [...pts, { x, y }] });
 			}
+			setSnapGuides([]);
 			return;
 		}
 		if (drag.type === "pan") return;
@@ -554,14 +661,26 @@ export function CanvasArea({
 		const tool = drag.type;
 
 		if (tool === "move" && drag.layerId && drag.layerOffset) {
-			dispatch({
-				type: "UPDATE_LAYER",
-				id: drag.layerId,
-				patch: {
-					x: drag.layerOffset.x + (x - drag.startX),
-					y: drag.layerOffset.y + (y - drag.startY),
-				},
-			});
+			const proposedX = drag.layerOffset.x + (x - drag.startX);
+			const proposedY = drag.layerOffset.y + (y - drag.startY);
+			const moving = state.layers.find((l) => l.id === drag.layerId);
+			if (moving) {
+				const snapped = snapLayerMove(
+					proposedX,
+					proposedY,
+					moving,
+					state.layers,
+					state.canvasWidth,
+					state.canvasHeight,
+					true,
+				);
+				setSnapGuides(snapped.guides);
+				dispatch({
+					type: "UPDATE_LAYER",
+					id: drag.layerId,
+					patch: { x: snapped.x, y: snapped.y },
+				});
+			}
 			return;
 		}
 
@@ -593,9 +712,32 @@ export function CanvasArea({
 			(tool === "brush" || tool === "pencil" || tool === "eraser") &&
 			activeLayer
 		) {
-			paintWithSelection((ctx) => {
-				drawStroke(ctx, drag.lastX, drag.lastY, x, y, tool);
-			}, activeLayer);
+			if (activeLayer.maskEditing && activeLayer.mask) {
+				const ctx = activeLayer.mask.getContext("2d")!;
+				ctx.save();
+				ctx.globalCompositeOperation = "source-over";
+				drawBrushStroke(
+					ctx,
+					drag.lastX,
+					drag.lastY,
+					x,
+					y,
+					brushOptionsFromState(
+						{
+							...state.brush,
+							blendMode: "source-over",
+						},
+						tool === "eraser" ? "#000000" : "#ffffff",
+						"brush",
+						pressureRef.current,
+					),
+				);
+				ctx.restore();
+			} else {
+				paintWithSelection((ctx) => {
+					drawStroke(ctx, drag.lastX, drag.lastY, x, y, tool);
+				}, activeLayer);
+			}
 			drag.lastX = x;
 			drag.lastY = y;
 			scheduleRender();
@@ -603,12 +745,36 @@ export function CanvasArea({
 		}
 
 		if (
-			(tool === "shape-rect" ||
-				tool === "shape-ellipse" ||
-				tool === "shape-line" ||
-				tool === "shape-arrow" ||
-				tool === "gradient") &&
-			activeLayer
+			tool === "clone-stamp" &&
+			activeLayer &&
+			state.cloneSource &&
+			cloneAnchorRef.current
+		) {
+			drawCloneStampStroke(
+				activeLayer,
+				drag.lastX,
+				drag.lastY,
+				x,
+				y,
+				state.cloneSource,
+				cloneAnchorRef.current,
+				state.brush,
+				state.layers,
+				state.canvasWidth,
+				state.canvasHeight,
+			);
+			drag.lastX = x;
+			drag.lastY = y;
+			scheduleRender();
+			return;
+		}
+
+		if (
+			tool === "shape-rect" ||
+			tool === "shape-ellipse" ||
+			tool === "shape-line" ||
+			tool === "shape-arrow" ||
+			tool === "gradient"
 		) {
 			drag.lastX = x;
 			drag.lastY = y;
@@ -624,6 +790,14 @@ export function CanvasArea({
 	};
 
 	const onMouseUp = (e?: React.MouseEvent) => {
+		if (scaleDragRef.current) {
+			if (activeLayer) commitHistory("Scale Layer");
+			scaleDragRef.current = null;
+			pendingMoveRef.current = null;
+			setSnapGuides([]);
+			return;
+		}
+
 		if (rotateDragRef.current) {
 			if (activeLayer) commitHistory("Rotate Layer");
 			rotateDragRef.current = null;
@@ -639,12 +813,20 @@ export function CanvasArea({
 		const drag = dragRef.current;
 		if (!drag) return;
 		dragRef.current = null;
+		setSnapGuides([]);
 
 		if (drag.type === "move") {
 			const moved =
 				Math.hypot(drag.lastX - drag.startX, drag.lastY - drag.startY) >=
 				MOVE_DRAG_THRESHOLD_DOC / layoutRef.current.scale;
 			if (moved) commitHistory("Move Layer");
+			return;
+		}
+
+		if (drag.type === "clone-stamp") {
+			flushRender();
+			commitHistory("Clone Stamp");
+			cloneAnchorRef.current = null;
 			return;
 		}
 
@@ -708,121 +890,110 @@ export function CanvasArea({
 			return;
 		}
 
-		if (layer && !layer.locked) {
-			const ctx = layer.canvas.getContext("2d")!;
-			const { shape, foregroundColor, backgroundColor } = state;
+		const shapeKindMap: Record<string, ShapeData["kind"]> = {
+			"shape-rect": "rect",
+			"shape-ellipse": "ellipse",
+			"shape-line": "line",
+			"shape-arrow": "arrow",
+		};
+		const shapeKind = shapeKindMap[drag.type];
+		if (shapeKind) {
+			const { shape } = state;
+			const r = normalizeRect(drag.startX, drag.startY, endX, endY);
+			const lineLen = Math.hypot(endX - drag.startX, endY - drag.startY);
+			const hasSize =
+				shapeKind === "line" || shapeKind === "arrow"
+					? lineLen > 1
+					: r.width > 1 || r.height > 1;
+			if (hasSize) {
+				const shapeData: ShapeData = {
+					kind: shapeKind,
+					x0: drag.startX,
+					y0: drag.startY,
+					x1: endX,
+					y1: endY,
+					fillColor: shape.fillColor,
+					strokeColor: shape.strokeColor,
+					strokeWidth: shape.strokeWidth,
+					filled: shape.filled,
+					cornerRadius: shape.cornerRadius,
+					lineCap: shape.lineCap,
+					lineJoin: shape.lineJoin,
+				};
+				const shapeLayer = createLayer(
+					state.canvasWidth,
+					state.canvasHeight,
+					`${shapeKind[0]!.toUpperCase()}${shapeKind.slice(1)}`,
+					{ type: "shape", shapeData },
+				);
+				renderShapeLayer(shapeLayer);
+				const activeIdx = state.activeLayerId
+					? state.layers.findIndex((l) => l.id === state.activeLayerId)
+					: -1;
+				const layers = [...state.layers];
+				if (activeIdx >= 0) layers.splice(activeIdx + 1, 0, shapeLayer);
+				else layers.push(shapeLayer);
+				dispatch({ type: "SET_LAYERS", layers });
+				dispatch({ type: "SET_ACTIVE_LAYER", id: shapeLayer.id });
+				commitHistory(
+					shapeKind === "rect"
+						? "Rectangle"
+						: shapeKind === "ellipse"
+							? "Ellipse"
+							: shapeKind === "line"
+								? "Line"
+								: "Arrow",
+				);
+				setShapeCommitFlash({
+					kind: drag.type as ShapeDrawPreview["kind"],
+					startX: drag.startX,
+					startY: drag.startY,
+					endX,
+					endY,
+				});
+			}
+			setShapePreview(null);
+			dispatch({ type: "BUMP_RENDER" });
+			setPreviewSel(null);
+			return;
+		}
 
-			const shapeTools = new Set([
-				"gradient",
-				"shape-rect",
-				"shape-ellipse",
-				"shape-line",
-				"shape-arrow",
-			]);
+		if (layer && !layer.locked) {
+			const { foregroundColor, backgroundColor, gradient } = state;
 
 			if (drag.type === "gradient") {
-				const g = ctx.createLinearGradient(
-					drag.startX,
-					drag.startY,
-					endX,
-					endY,
-				);
-				g.addColorStop(0, foregroundColor);
-				g.addColorStop(1, backgroundColor);
-				ctx.fillStyle = g;
-				const r = normalizeRect(drag.startX, drag.startY, endX, endY);
-				if (r.width > 0 || r.height > 0) {
-					ctx.fillRect(r.x, r.y, r.width, r.height);
-				}
-				commitHistory("Gradient");
-			}
-
-			if (drag.type === "shape-rect") {
-				const r = normalizeRect(drag.startX, drag.startY, endX, endY);
-				ctx.lineCap = shape.lineCap;
-				ctx.lineJoin = shape.lineJoin;
-				if (shape.filled) {
-					ctx.fillStyle = shape.fillColor;
-					if (shape.cornerRadius > 0) {
+				const ctx = layer.canvas.getContext("2d")!;
+				const settings =
+					gradient.stops.length >= 2
+						? gradient
+						: {
+								...gradient,
+								stops: [
+									{ offset: 0, color: foregroundColor },
+									{ offset: 1, color: backgroundColor },
+								],
+							};
+				const lineLen = Math.hypot(endX - drag.startX, endY - drag.startY);
+				if (lineLen > 1) {
+					const g = createGradientFromDrag(
+						ctx,
+						settings,
+						drag.startX,
+						drag.startY,
+						endX,
+						endY,
+					);
+					ctx.fillStyle = g;
+					if (settings.type === "radial") {
 						ctx.beginPath();
-						ctx.roundRect(r.x, r.y, r.width, r.height, shape.cornerRadius);
+						ctx.arc(drag.startX, drag.startY, lineLen, 0, Math.PI * 2);
 						ctx.fill();
 					} else {
-						ctx.fillRect(r.x, r.y, r.width, r.height);
+						ctx.fillRect(0, 0, layer.canvas.width, layer.canvas.height);
 					}
-				}
-				ctx.strokeStyle = shape.strokeColor;
-				ctx.lineWidth = shape.strokeWidth;
-				if (shape.cornerRadius > 0) {
-					ctx.beginPath();
-					ctx.roundRect(r.x, r.y, r.width, r.height, shape.cornerRadius);
-					ctx.stroke();
-				} else {
-					ctx.strokeRect(r.x, r.y, r.width, r.height);
-				}
-				commitHistory("Rectangle");
-			}
-
-			if (drag.type === "shape-ellipse") {
-				const r = normalizeRect(drag.startX, drag.startY, endX, endY);
-				ctx.beginPath();
-				ctx.ellipse(
-					r.x + r.width / 2,
-					r.y + r.height / 2,
-					Math.abs(r.width / 2),
-					Math.abs(r.height / 2),
-					0,
-					0,
-					Math.PI * 2,
-				);
-				if (shape.filled) {
-					ctx.fillStyle = shape.fillColor;
-					ctx.fill();
-				}
-				ctx.strokeStyle = shape.strokeColor;
-				ctx.lineWidth = shape.strokeWidth;
-				ctx.stroke();
-				commitHistory("Ellipse");
-			}
-
-			if (drag.type === "shape-line") {
-				ctx.beginPath();
-				ctx.moveTo(drag.startX, drag.startY);
-				ctx.lineTo(endX, endY);
-				ctx.strokeStyle = shape.strokeColor;
-				ctx.lineWidth = shape.strokeWidth;
-				ctx.lineCap = shape.lineCap;
-				ctx.lineJoin = shape.lineJoin;
-				ctx.stroke();
-				commitHistory("Line");
-			}
-
-			if (drag.type === "shape-arrow") {
-				ctx.strokeStyle = shape.strokeColor;
-				ctx.fillStyle = shape.strokeColor;
-				ctx.lineWidth = shape.strokeWidth;
-				drawArrow(
-					ctx,
-					drag.startX,
-					drag.startY,
-					endX,
-					endY,
-					shape.strokeWidth,
-					shape.lineCap,
-				);
-				commitHistory("Arrow");
-			}
-
-			if (shapeTools.has(drag.type)) {
-				const r = normalizeRect(drag.startX, drag.startY, endX, endY);
-				const lineLen = Math.hypot(endX - drag.startX, endY - drag.startY);
-				const hasSize =
-					drag.type === "shape-line" || drag.type === "shape-arrow"
-						? lineLen > 1
-						: r.width > 1 || r.height > 1;
-				if (hasSize) {
+					commitHistory("Gradient");
 					setShapeCommitFlash({
-						kind: drag.type as ShapeDrawPreview["kind"],
+						kind: "gradient",
 						startX: drag.startX,
 						startY: drag.startY,
 						endX,
@@ -839,12 +1010,15 @@ export function CanvasArea({
 				drag.type === "eraser"
 			) {
 				flushRender();
+				dispatch({ type: "PUSH_RECENT_BRUSH" });
 				commitHistory(
-					drag.type === "eraser"
-						? "Eraser"
-						: drag.type === "pencil"
-							? "Pencil"
-							: "Brush",
+					activeLayer?.maskEditing
+						? "Paint Mask"
+						: drag.type === "eraser"
+							? "Eraser"
+							: drag.type === "pencil"
+								? "Pencil"
+								: "Brush",
 				);
 			}
 		}
@@ -948,31 +1122,45 @@ export function CanvasArea({
 				const next = s.zoom + delta;
 				dispatch({ type: "SET_ZOOM", zoom: next });
 				showZoomHint(next);
+				markViewportBusy();
 			} else {
 				dispatch({
 					type: "SET_PAN",
 					panX: s.panX - e.deltaX,
 					panY: s.panY - e.deltaY,
 				});
+				markViewportBusy();
 			}
 		};
 		el.addEventListener("wheel", onWheel, { passive: false });
 		return () => {
 			el.removeEventListener("wheel", onWheel);
 			if (zoomHintTimer.current) clearTimeout(zoomHintTimer.current);
+			if (viewportIdleTimer.current) clearTimeout(viewportIdleTimer.current);
 		};
-	}, [dispatch, showZoomHint]);
+	}, [dispatch, showZoomHint, markViewportBusy]);
 
 	const cursor = spacePan
 		? "grabbing"
 		: state.tool === "hand"
 			? "grab"
 			: (CURSORS[state.tool] ?? "default");
+	const usePreview =
+		viewportBusy &&
+		getDocumentProfile(state.canvasWidth, state.canvasHeight, 1).isLarge;
+
 	return (
 		<div
 			ref={containerRef}
 			className="canvas-workspace smooth-scroll absolute inset-0 size-full overflow-auto"
 			style={{ cursor }}
+			onPointerDown={(e) => {
+				updatePressure(e);
+				if (e.pointerType !== "mouse") {
+					(e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+				}
+			}}
+			onPointerMove={(e) => updatePressure(e)}
 			onMouseDown={onMouseDown}
 			onMouseMove={onMouseMove}
 			onMouseUp={(e) => onMouseUp(e)}
@@ -1028,6 +1216,7 @@ export function CanvasArea({
 						viewportW={viewport.w}
 						viewportH={viewport.h}
 						renderTick={state.renderTick}
+						usePreview={usePreview}
 					/>
 				</div>
 
@@ -1037,6 +1226,67 @@ export function CanvasArea({
 						docWidth={state.canvasWidth}
 						docHeight={state.canvasHeight}
 						layout={layout}
+					/>
+				)}
+
+				<SnapGuidesOverlay
+					guides={snapGuides}
+					layout={layout}
+					docWidth={state.canvasWidth}
+					docHeight={state.canvasHeight}
+				/>
+
+				<BrushCursorPreview
+					docX={cursorDoc.x}
+					docY={cursorDoc.y}
+					size={state.brush.size}
+					layout={layout}
+					visible={
+						state.tool === "brush" ||
+						state.tool === "pencil" ||
+						state.tool === "eraser" ||
+						state.tool === "clone-stamp"
+					}
+				/>
+
+				{textDraft && (
+					<InlineTextEditor
+						draft={textDraft}
+						layout={layout}
+						onChange={(patch) =>
+							setTextDraft((d) => (d ? { ...d, ...patch } : d))
+						}
+						onCancel={() => setTextDraft(null)}
+						onCommit={() => {
+							if (!textDraft || !textDraft.text.trim()) {
+								setTextDraft(null);
+								return;
+							}
+							const textData = { ...textDraft };
+							if (!activeLayer || activeLayer.type !== "text") {
+								const newLayer = createLayer(
+									state.canvasWidth,
+									state.canvasHeight,
+									"Text",
+									{ type: "text", textData },
+								);
+								renderTextLayer(newLayer);
+								dispatch({
+									type: "SET_LAYERS",
+									layers: [...state.layers, newLayer],
+								});
+								dispatch({ type: "SET_ACTIVE_LAYER", id: newLayer.id });
+							} else {
+								dispatch({
+									type: "UPDATE_LAYER",
+									id: activeLayer.id,
+									patch: { textData, type: "text" },
+								});
+								renderTextLayer({ ...activeLayer, textData, type: "text" });
+							}
+							commitHistory("Text");
+							setTextDraft(null);
+						}}
 					/>
 				)}
 

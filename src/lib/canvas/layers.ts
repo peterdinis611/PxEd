@@ -1,6 +1,14 @@
 import { generateId } from "@/lib/utils";
-import type { BlendMode, Layer, LayerSnapshot, TextData } from "@/types/editor";
+import type {
+	BlendMode,
+	Layer,
+	LayerSnapshot,
+	ShapeData,
+	TextData,
+} from "@/types/editor";
 import type { ImageSourceMetadata } from "@/types/imageMetadata";
+import { drawArrow } from "@/lib/canvas/shapes";
+import { normalizeRect } from "@/lib/canvas/selection";
 
 export function createLayerCanvas(
 	width: number,
@@ -26,6 +34,7 @@ export function createLayer(
 		fill?: string;
 		type?: Layer["type"];
 		textData?: TextData;
+		shapeData?: ShapeData;
 		sourceMetadata?: ImageSourceMetadata;
 	},
 ): Layer {
@@ -40,8 +49,11 @@ export function createLayer(
 		x: 0,
 		y: 0,
 		rotation: 0,
+		scaleX: 1,
+		scaleY: 1,
 		type: options?.type ?? "pixel",
 		textData: options?.textData,
+		shapeData: options?.shapeData,
 		sourceMetadata: options?.sourceMetadata,
 	};
 }
@@ -50,12 +62,21 @@ export function cloneLayer(layer: Layer): Layer {
 	const canvas = createLayerCanvas(layer.canvas.width, layer.canvas.height);
 	const ctx = canvas.getContext("2d")!;
 	ctx.drawImage(layer.canvas, 0, 0);
+	let mask: HTMLCanvasElement | undefined;
+	if (layer.mask) {
+		mask = createLayerCanvas(layer.mask.width, layer.mask.height);
+		mask.getContext("2d")!.drawImage(layer.mask, 0, 0);
+	}
 	return {
 		...layer,
 		id: generateId(),
 		name: `${layer.name} copy`,
 		canvas,
+		mask,
+		scaleX: layer.scaleX ?? 1,
+		scaleY: layer.scaleY ?? 1,
 		textData: layer.textData ? { ...layer.textData } : undefined,
+		shapeData: layer.shapeData ? { ...layer.shapeData } : undefined,
 		sourceMetadata: layer.sourceMetadata
 			? {
 					...layer.sourceMetadata,
@@ -80,8 +101,17 @@ export function snapshotLayer(layer: Layer): LayerSnapshot {
 		x: layer.x,
 		y: layer.y,
 		rotation: layer.rotation ?? 0,
+		scaleX: layer.scaleX ?? 1,
+		scaleY: layer.scaleY ?? 1,
+		maskImageData: layer.mask
+			? layer.mask
+					.getContext("2d")!
+					.getImageData(0, 0, layer.mask.width, layer.mask.height)
+			: undefined,
+		maskEditing: layer.maskEditing,
 		type: layer.type,
 		textData: layer.textData ? { ...layer.textData } : undefined,
+		shapeData: layer.shapeData ? { ...layer.shapeData } : undefined,
 		sourceMetadata: layer.sourceMetadata
 			? {
 					...layer.sourceMetadata,
@@ -98,9 +128,17 @@ export function restoreLayerFromSnapshot(
 	width: number,
 	height: number,
 ): Layer {
-	const canvas = createLayerCanvas(width, height);
+	const canvas = createLayerCanvas(
+		snap.imageData.width || width,
+		snap.imageData.height || height,
+	);
 	const ctx = canvas.getContext("2d")!;
 	ctx.putImageData(snap.imageData, 0, 0);
+	let mask: HTMLCanvasElement | undefined;
+	if (snap.maskImageData) {
+		mask = createLayerCanvas(snap.maskImageData.width, snap.maskImageData.height);
+		mask.getContext("2d")!.putImageData(snap.maskImageData, 0, 0);
+	}
 	return {
 		id: snap.id,
 		name: snap.name,
@@ -112,8 +150,13 @@ export function restoreLayerFromSnapshot(
 		x: snap.x,
 		y: snap.y,
 		rotation: snap.rotation ?? 0,
+		scaleX: snap.scaleX ?? 1,
+		scaleY: snap.scaleY ?? 1,
+		mask,
+		maskEditing: snap.maskEditing,
 		type: snap.type,
 		textData: snap.textData ? { ...snap.textData } : undefined,
+		shapeData: snap.shapeData ? { ...snap.shapeData } : undefined,
 		sourceMetadata: snap.sourceMetadata
 			? {
 					...snap.sourceMetadata,
@@ -151,4 +194,58 @@ export function renderTextLayer(layer: Layer): void {
 			ctx.stroke();
 		}
 	});
+}
+
+/** Rasterize editable shape data onto the layer canvas (keeps shapeData for re-edit). */
+export function renderShapeLayer(layer: Layer): void {
+	if (layer.type !== "shape" || !layer.shapeData) return;
+	const ctx = layer.canvas.getContext("2d")!;
+	const s = layer.shapeData;
+	ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+	ctx.lineCap = s.lineCap;
+	ctx.lineJoin = s.lineJoin;
+	ctx.lineWidth = s.strokeWidth;
+	ctx.strokeStyle = s.strokeColor;
+	ctx.fillStyle = s.fillColor;
+
+	if (s.kind === "rect") {
+		const r = normalizeRect(s.x0, s.y0, s.x1, s.y1);
+		if (s.filled) {
+			if (s.cornerRadius > 0) {
+				ctx.beginPath();
+				ctx.roundRect(r.x, r.y, r.width, r.height, s.cornerRadius);
+				ctx.fill();
+			} else {
+				ctx.fillRect(r.x, r.y, r.width, r.height);
+			}
+		}
+		if (s.cornerRadius > 0) {
+			ctx.beginPath();
+			ctx.roundRect(r.x, r.y, r.width, r.height, s.cornerRadius);
+			ctx.stroke();
+		} else {
+			ctx.strokeRect(r.x, r.y, r.width, r.height);
+		}
+	} else if (s.kind === "ellipse") {
+		const r = normalizeRect(s.x0, s.y0, s.x1, s.y1);
+		ctx.beginPath();
+		ctx.ellipse(
+			r.x + r.width / 2,
+			r.y + r.height / 2,
+			Math.abs(r.width / 2),
+			Math.abs(r.height / 2),
+			0,
+			0,
+			Math.PI * 2,
+		);
+		if (s.filled) ctx.fill();
+		ctx.stroke();
+	} else if (s.kind === "line") {
+		ctx.beginPath();
+		ctx.moveTo(s.x0, s.y0);
+		ctx.lineTo(s.x1, s.y1);
+		ctx.stroke();
+	} else if (s.kind === "arrow") {
+		drawArrow(ctx, s.x0, s.y0, s.x1, s.y1, s.strokeWidth, s.lineCap);
+	}
 }
