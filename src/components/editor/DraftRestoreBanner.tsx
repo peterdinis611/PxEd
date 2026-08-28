@@ -27,16 +27,16 @@ export function DraftRestoreBanner() {
 					className="pointer-events-auto absolute left-1/2 top-3 z-30 w-[min(100%-1.5rem,28rem)] -translate-x-1/2"
 					role="alert"
 				>
-					<div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-zinc-900/95 px-3 py-2.5 shadow-lg ring-1 ring-blue-500/20 backdrop-blur-sm">
+					<div className="flex items-start gap-3 rounded-lg border border-accent bg-[var(--color-editor-panel)]/95 px-3 py-2.5 shadow-lg ring-accent-inset backdrop-blur-sm">
 						<Clock
-							className="mt-0.5 h-4 w-4 shrink-0 text-blue-400"
+							className="text-accent mt-0.5 h-4 w-4 shrink-0"
 							aria-hidden
 						/>
 						<div className="min-w-0 flex-1 text-left">
-							<p className="text-ui-xs font-medium text-zinc-100">
+							<p className="text-ui-xs font-medium text-[var(--color-editor-text)]">
 								Recover autosaved draft?
 							</p>
-							<p className="mt-0.5 text-[10px] leading-snug text-zinc-500">
+							<p className="mt-0.5 font-data text-[10px] leading-snug text-[var(--color-editor-muted)]">
 								Saved {formatDraftTime(pendingDraft.savedAt)} ·{" "}
 								{pendingDraft.canvasWidth}×{pendingDraft.canvasHeight} ·{" "}
 								{pendingDraft.layers.length} layer

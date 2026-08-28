@@ -312,7 +312,7 @@ export function ColorPicker({
 								className={cn(
 									"h-6 w-6 rounded border border-zinc-600/80 transition-transform hover:scale-110",
 									c === hex &&
-										"ring-2 ring-blue-500 ring-offset-1 ring-offset-zinc-800",
+										"ring-2 ring-[var(--color-editor-accent)] ring-offset-1 ring-offset-[var(--color-editor-bg)]",
 								)}
 								style={{ backgroundColor: c }}
 								onClick={() => {
@@ -335,7 +335,7 @@ export function ColorPicker({
 									title={c}
 									className={cn(
 										"h-6 w-6 rounded border border-zinc-600",
-										c === hex && "ring-2 ring-blue-500",
+										c === hex && "ring-2 ring-[var(--color-editor-accent)]",
 									)}
 									style={{ backgroundColor: c }}
 									onClick={() => {

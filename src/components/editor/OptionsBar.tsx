@@ -197,7 +197,7 @@ export function OptionsBar() {
 					key={tool}
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					className="w-14 shrink-0 text-ui-xs font-semibold text-zinc-300"
+					className="w-14 shrink-0 text-ui-xs font-semibold text-[var(--color-editor-text)]/90"
 				>
 					{TOOL_LABELS[tool]}
 				</motion.span>

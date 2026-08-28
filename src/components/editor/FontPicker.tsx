@@ -92,7 +92,7 @@ export function FontPicker({
 								type="button"
 								className={cn(
 									"interactive flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-ui-xs text-zinc-200 hover:bg-zinc-700/60",
-									family === value && "bg-blue-500/15 text-blue-200",
+									family === value && "bg-accent-subtle text-accent",
 								)}
 								style={{
 									fontFamily:

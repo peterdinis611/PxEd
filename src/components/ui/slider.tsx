@@ -33,15 +33,15 @@ const Slider = React.forwardRef<
 		>
 			<SliderPrimitive.Track
 				className={cn(
-					"relative w-full grow overflow-hidden rounded-full bg-zinc-700/80",
+					"relative w-full grow overflow-hidden rounded-full bg-[var(--color-editor-border)]/80",
 					v.track,
 				)}
 			>
-				<SliderPrimitive.Range className="absolute h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-150" />
+				<SliderPrimitive.Range className="absolute h-full rounded-full bg-[var(--color-editor-accent)] transition-all duration-150" />
 			</SliderPrimitive.Track>
 			<SliderPrimitive.Thumb
 				className={cn(
-					"interactive block rounded-full border-2 border-zinc-900 bg-zinc-100 shadow-md shadow-black/30 transition-shadow hover:shadow-blue-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/80 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900",
+					"interactive block rounded-full border-2 border-[var(--color-editor-bg)] bg-[var(--color-editor-text)] shadow-md shadow-black/30 transition-shadow hover:shadow-[var(--color-editor-accent-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-editor-accent)]/80 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--color-editor-bg)]",
 					v.thumb,
 				)}
 			/>

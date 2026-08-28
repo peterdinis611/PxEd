@@ -73,7 +73,7 @@ export function FiltersGallery({ disabled }: { disabled?: boolean }) {
 					className={cn(
 						"interactive flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900/80 p-1.5 text-ui-xs text-zinc-400 transition-colors",
 						"hover:border-zinc-600 hover:text-zinc-200",
-						busy === item.id && "border-blue-500/50 text-blue-300",
+						busy === item.id && "border-accent text-accent",
 					)}
 					onClick={() => {
 						setBusy(item.id);

@@ -56,7 +56,7 @@ export function InlineTextEditor({
 						onCommit();
 					}
 				}}
-				className="min-h-[2.5rem] min-w-[12rem] resize rounded border border-blue-500/80 bg-zinc-950/90 px-2 py-1 text-zinc-100 shadow-lg outline-none focus:ring-2 focus:ring-blue-500/50"
+				className="min-h-[2.5rem] min-w-[12rem] resize rounded border border-accent bg-[var(--color-editor-bg)]/95 px-2 py-1 text-[var(--color-editor-text)] shadow-lg outline-none focus:ring-2 focus:ring-[var(--color-editor-accent-glow)]"
 				style={{
 					fontFamily: draft.font,
 					fontSize: Math.max(12, draft.size * layout.scale),

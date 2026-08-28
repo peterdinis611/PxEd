@@ -16,13 +16,13 @@ const ICONS: Record<
 const VARIANT_STYLES: Record<ToastVariant, string> = {
 	success: "border-emerald-500/30 bg-zinc-900/95 text-emerald-50",
 	error: "border-red-500/35 bg-zinc-900/95 text-red-50",
-	info: "border-blue-500/30 bg-zinc-900/95 text-zinc-100",
+	info: "border-accent bg-[var(--color-editor-panel)]/95 text-[var(--color-editor-text)]",
 };
 
 const ICON_STYLES: Record<ToastVariant, string> = {
 	success: "text-emerald-400",
 	error: "text-red-400",
-	info: "text-blue-400",
+	info: "text-accent",
 };
 
 export function Toaster() {

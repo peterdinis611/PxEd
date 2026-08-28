@@ -32,7 +32,7 @@ export function PropertiesPanel() {
 	return (
 		<section className="sidebar-section flex min-h-0 flex-1 flex-col">
 			<div
-				className="flex shrink-0 items-center gap-0.5 border-b border-zinc-800 px-1 py-0.5"
+				className="flex shrink-0 items-center gap-0.5 border-b border-[var(--color-editor-border)] px-1 py-0.5"
 				role="tablist"
 				aria-label="Adjustments panel"
 			>
@@ -45,8 +45,8 @@ export function PropertiesPanel() {
 						className={cn(
 							"interactive flex-1 rounded px-2 py-1.5 text-ui-xs font-medium transition-colors",
 							tab === id
-								? "bg-zinc-800 text-zinc-200"
-								: "text-zinc-600 hover:text-zinc-400",
+								? "bg-[var(--color-editor-elevated)] text-[var(--color-editor-text)] ring-accent-inset"
+								: "text-[var(--color-editor-muted)] hover:text-[var(--color-editor-text)]/80",
 						)}
 						onClick={() => setTab(id)}
 					>
@@ -194,8 +194,8 @@ function HistoryPanel({
 							className={cn(
 								"interactive h-full w-full rounded px-2 py-1.5 text-left text-ui-xs",
 								i === state.historyIndex
-									? "bg-blue-500/15 font-medium text-blue-300 ring-1 ring-blue-500/30"
-									: "text-zinc-400 hover:bg-zinc-700/60 hover:text-zinc-200",
+									? "bg-accent-subtle font-medium text-accent ring-accent-inset"
+									: "text-[var(--color-editor-muted)] hover:bg-[var(--color-editor-elevated)]/80 hover:text-[var(--color-editor-text)]",
 							)}
 							onClick={() => dispatch({ type: "JUMP_HISTORY", index: i })}
 						>

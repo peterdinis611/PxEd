@@ -1,23 +1,19 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-editor-bg: #141414;
-  --color-editor-surface: #1c1c1e;
-  --color-editor-panel: #252528;
-  --color-editor-elevated: #2e2e32;
-  --color-editor-border: #3a3a40;
-  --color-editor-accent: #3b82f6;
-  --color-editor-accent-glow: rgb(59 130 246 / 0.35);
-  --font-editor: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-}
-
-@font-face {
-	font-family: "Inter";
-	font-style: normal;
-	font-weight: 400 600;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/inter/v18/UcCo3FwrK3iLTcvhwAOCKOOj.woff2")
-		format("woff2");
+  --color-editor-bg: #0c0d10;
+  --color-editor-surface: #14161c;
+  --color-editor-panel: #1a1d26;
+  --color-editor-elevated: #22262f;
+  --color-editor-border: #2a2f3a;
+  --color-editor-accent: #e8a035;
+  --color-editor-accent-dim: #b87828;
+  --color-editor-accent-glow: rgb(232 160 53 / 0.32);
+  --color-editor-text: #ece8e1;
+  --color-editor-muted: #8a939e;
+  --font-display: "Syne", ui-sans-serif, sans-serif;
+  --font-ui: "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * {
@@ -39,13 +35,26 @@ body,
 }
 
 body {
-	font-family: var(--font-editor);
+	font-family: var(--font-ui);
 	font-size: 1rem;
 	line-height: 1.45;
 	background: var(--color-editor-bg);
-	color: #f4f4f5;
+	color: var(--color-editor-text);
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+	font-family: var(--font-display);
+}
+
+.font-ui {
+	font-family: var(--font-ui);
+}
+
+.font-data {
+	font-family: var(--font-data);
+	font-variant-numeric: tabular-nums;
 }
 
 /* Editor UI typography — desktop-dense */
@@ -70,20 +79,44 @@ body {
 	font-size: 0.9375rem;
 }
 
-/* Subtle app backdrop */
+/* Darkroom bench — subtle grain, no generic blue wash */
 .editor-shell {
-	background:
-		radial-gradient(
-			ellipse 80% 50% at 50% -20%,
-			rgb(59 130 246 / 0.08),
-			transparent
-		),
-		radial-gradient(
-			ellipse 60% 40% at 100% 100%,
-			rgb(99 102 241 / 0.05),
-			transparent
-		),
-		var(--color-editor-bg);
+	position: relative;
+	background: var(--color-editor-bg);
+}
+
+.editor-shell::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0.045;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+	background-size: 180px 180px;
+	z-index: 0;
+}
+
+.editor-shell > * {
+	position: relative;
+	z-index: 1;
+}
+
+/* Light-table vault — signature safelight edge around the canvas */
+.canvas-vault {
+	position: relative;
+	min-height: 0;
+	background: #08090b;
+}
+
+.canvas-vault::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 2;
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--color-editor-accent) 22%, transparent),
+		inset 0 0 72px 0 color-mix(in srgb, var(--color-editor-accent) 6%, transparent);
 }
 
 .panel-glass {
@@ -91,17 +124,18 @@ body {
 }
 
 .panel-header {
-	letter-spacing: 0.06em;
+	letter-spacing: 0.08em;
 	font-size: 0.625rem;
 	font-weight: 600;
+	font-family: var(--font-data);
 	text-transform: uppercase;
-	color: #71717a;
+	color: var(--color-editor-muted);
 }
 
 .chrome-bar {
-	background: var(--color-editor-surface);
+	background: color-mix(in srgb, var(--color-editor-surface) 92%, black);
 	border-bottom: 1px solid
-		color-mix(in srgb, var(--color-editor-border) 70%, transparent);
+		color-mix(in srgb, var(--color-editor-border) 80%, transparent);
 }
 
 .chrome-vdivider {
@@ -109,7 +143,7 @@ body {
 	align-self: stretch;
 	min-height: 1.25rem;
 	background: var(--color-editor-border);
-	opacity: 0.65;
+	opacity: 0.55;
 }
 
 .field-num {
@@ -117,13 +151,14 @@ body {
 	width: 2.5rem;
 	padding: 0 0.25rem;
 	text-align: center;
+	font-family: var(--font-data);
 	font-size: 0.6875rem;
 	font-variant-numeric: tabular-nums;
-	border-radius: 0.25rem;
+	border-radius: 0.2rem;
 	border: 1px solid
-		color-mix(in srgb, var(--color-editor-border) 80%, transparent);
+		color-mix(in srgb, var(--color-editor-border) 85%, transparent);
 	background: var(--color-editor-bg);
-	color: #e4e4e7;
+	color: var(--color-editor-text);
 }
 
 .field-num:focus-visible {
@@ -134,7 +169,42 @@ body {
 
 .sidebar-section {
 	border-top: 1px solid
-		color-mix(in srgb, var(--color-editor-border) 55%, transparent);
+		color-mix(in srgb, var(--color-editor-border) 60%, transparent);
+}
+
+.sidebar-rail {
+	border-color: color-mix(in srgb, var(--color-editor-border) 75%, transparent);
+	background: var(--color-editor-surface);
+}
+
+/* Accent utilities — one warm voice across chrome */
+.text-accent {
+	color: var(--color-editor-accent);
+}
+
+.bg-accent-subtle {
+	background: color-mix(in srgb, var(--color-editor-accent) 12%, transparent);
+}
+
+.ring-accent-inset {
+	box-shadow: inset 0 0 0 1px
+		color-mix(in srgb, var(--color-editor-accent) 38%, transparent);
+}
+
+.border-accent {
+	border-color: color-mix(in srgb, var(--color-editor-accent) 45%, transparent);
+}
+
+.chip-accent {
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--color-editor-accent) 14%, transparent);
+	color: var(--color-editor-accent);
+}
+
+.focus-accent:focus-visible {
+	outline: none;
+	border-color: color-mix(in srgb, var(--color-editor-accent) 55%, transparent);
+	box-shadow: 0 0 0 2px var(--color-editor-accent-glow);
 }
 
 /* Smooth scrolling in panels */
@@ -143,8 +213,8 @@ body {
 }
 
 .smooth-scroll::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
+	width: 5px;
+	height: 5px;
 }
 
 .smooth-scroll::-webkit-scrollbar-track {
@@ -152,13 +222,13 @@ body {
 }
 
 .smooth-scroll::-webkit-scrollbar-thumb {
-	background: #3f3f46;
+	background: color-mix(in srgb, var(--color-editor-border) 90%, white);
 	border-radius: 999px;
 	transition: background 0.2s ease;
 }
 
 .smooth-scroll::-webkit-scrollbar-thumb:hover {
-	background: #52525b;
+	background: var(--color-editor-muted);
 }
 
 /* Selection marching ants */
@@ -172,21 +242,6 @@ body {
 	animation: marching-ants 0.45s linear infinite;
 }
 
-/* Tool active glow pulse */
-@keyframes tool-glow {
-	0%,
-	100% {
-		box-shadow: 0 0 0 0 var(--color-editor-accent-glow);
-	}
-	50% {
-		box-shadow: 0 0 12px 2px var(--color-editor-accent-glow);
-	}
-}
-
-.tool-active-glow {
-	animation: tool-glow 2.5s ease-in-out infinite;
-}
-
 /* Shimmer for loading states */
 @keyframes shimmer {
 	0% {
@@ -197,7 +252,39 @@ body {
 	}
 }
 
-/* Dialog / menu entrance (CSS fallback) */
+/* Chrome entrance — one orchestrated load */
+@keyframes chrome-rise {
+	from {
+		opacity: 0;
+		transform: translateY(-3px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.chrome-enter {
+	animation: chrome-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.chrome-enter-delay-1 {
+	animation-delay: 0.04s;
+}
+.chrome-enter-delay-2 {
+	animation-delay: 0.08s;
+}
+.chrome-enter-delay-3 {
+	animation-delay: 0.12s;
+}
+.chrome-enter-delay-4 {
+	animation-delay: 0.16s;
+}
+.chrome-enter-delay-5 {
+	animation-delay: 0.2s;
+}
+
+/* Dialog / menu entrance */
 @keyframes dialog-in {
 	from {
 		opacity: 0;
@@ -239,6 +326,17 @@ body {
 	.smooth-scroll {
 		scroll-behavior: auto;
 	}
+
+	.chrome-enter,
+	.chrome-enter-delay-1,
+	.chrome-enter-delay-2,
+	.chrome-enter-delay-3,
+	.chrome-enter-delay-4,
+	.chrome-enter-delay-5 {
+		animation: none;
+		opacity: 1;
+		transform: none;
+	}
 }
 
 /* Interactive transitions */
@@ -256,27 +354,24 @@ body {
 	transform: scale(0.97);
 }
 
-/* Canvas document shadow */
+/* Konva is display-only — input is handled by the workspace container. */
+.canvas-document .konvajs-content {
+	pointer-events: none;
+}
+
+/* Canvas document — paper on the table */
 .canvas-document {
 	transition:
 		box-shadow 0.3s ease,
 		transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 	box-shadow:
-		0 0 0 1px rgb(255 255 255 / 0.06),
-		0 4px 6px -1px rgb(0 0 0 / 0.3),
-		0 20px 40px -12px rgb(0 0 0 / 0.5);
+		0 0 0 1px rgb(255 255 255 / 0.05),
+		0 2px 8px -2px rgb(0 0 0 / 0.45),
+		0 16px 40px -16px rgb(0 0 0 / 0.65);
 }
 
-.canvas-document:hover {
-	box-shadow:
-		0 0 0 1px rgb(255 255 255 / 0.08),
-		0 8px 16px -4px rgb(0 0 0 / 0.4),
-		0 24px 48px -12px rgb(0 0 0 / 0.55);
-}
-
-/* Canvas panel — checkerboard is drawn on the canvas bitmap */
 .canvas-workspace {
-	background-color: #121214;
+	background-color: #070809;
 	overscroll-behavior: contain;
 	-webkit-overflow-scrolling: touch;
 }
@@ -290,7 +385,7 @@ body {
 
 .color-swatch:hover {
 	transform: scale(1.08);
-	box-shadow: 0 0 0 2px rgb(59 130 246 / 0.5);
+	box-shadow: 0 0 0 2px var(--color-editor-accent-glow);
 }
 
 .color-swatch:active {

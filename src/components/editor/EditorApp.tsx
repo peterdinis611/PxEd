@@ -156,7 +156,7 @@ function EditorShell() {
 
 	return (
 		<div
-			className="editor-shell editor-ui fixed inset-0 grid overflow-hidden text-zinc-100"
+			className="editor-shell editor-ui fixed inset-0 grid overflow-hidden text-[var(--color-editor-text)]"
 			style={{
 				gridTemplateRows: "28px minmax(0, max-content) minmax(0, 1fr) 24px",
 				gridTemplateColumns: `52px minmax(0, 1fr) ${sidebarWidth}px`,
@@ -168,7 +168,10 @@ function EditorShell() {
         `,
 			}}
 		>
-			<header style={{ gridArea: "menu" }} className="min-h-0 overflow-hidden">
+			<header
+				style={{ gridArea: "menu" }}
+				className="chrome-enter min-h-0 overflow-hidden"
+			>
 				<MenuBar
 					onSelectAll={onSelectAll}
 					onDeselect={onDeselect}
@@ -181,18 +184,21 @@ function EditorShell() {
 
 			<div
 				style={{ gridArea: "options" }}
-				className="min-h-0 overflow-x-auto overflow-y-hidden"
+				className="chrome-enter chrome-enter-delay-1 min-h-0 overflow-x-auto overflow-y-hidden"
 			>
 				<OptionsBar />
 			</div>
 
-			<div style={{ gridArea: "tools" }} className="min-h-0 overflow-hidden">
+			<div
+				style={{ gridArea: "tools" }}
+				className="chrome-enter chrome-enter-delay-2 min-h-0 overflow-hidden"
+			>
 				<ToolsPanel />
 			</div>
 
 			<main
 				style={{ gridArea: "canvas" }}
-				className="relative min-h-0 min-w-0 overflow-hidden"
+				className="canvas-vault chrome-enter chrome-enter-delay-3 relative min-h-0 min-w-0 overflow-hidden"
 			>
 				<DraftRestoreBanner />
 				<CanvasArea
@@ -203,7 +209,7 @@ function EditorShell() {
 
 			<aside
 				style={{ gridArea: "sidebar" }}
-				className="relative flex min-h-0 min-w-0 flex-col overflow-hidden border-l border-zinc-800 bg-[var(--color-editor-surface)]"
+				className="sidebar-rail chrome-enter chrome-enter-delay-4 relative flex min-h-0 min-w-0 flex-col overflow-hidden border-l"
 			>
 				<button
 					type="button"
@@ -242,10 +248,12 @@ function EditorShell() {
 				>
 					<span className="sr-only">Resize sidebar</span>
 				</button>
-				<div className="flex items-center justify-between gap-1 border-b border-zinc-800 px-1 py-1">
-					<div className="flex items-center gap-1 text-zinc-500">
+				<div className="flex items-center justify-between gap-1 border-b border-[var(--color-editor-border)] px-1 py-1">
+					<div className="flex items-center gap-1 text-[var(--color-editor-muted)]">
 						<GripVertical className="h-3.5 w-3.5" />
-						<span className="text-[10px] uppercase tracking-wide">Panels</span>
+						<span className="font-data text-[10px] uppercase tracking-widest">
+							Stack
+						</span>
 					</div>
 					<div className="flex items-center gap-1">
 						<Button
@@ -275,7 +283,7 @@ function EditorShell() {
 
 			<footer
 				style={{ gridArea: "status" }}
-				className="min-h-0 overflow-hidden"
+				className="chrome-enter chrome-enter-delay-5 min-h-0 overflow-hidden"
 			>
 				<StatusBar cursor={cursor} spacePan={spacePan} />
 			</footer>

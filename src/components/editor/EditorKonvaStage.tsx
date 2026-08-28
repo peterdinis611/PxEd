@@ -81,6 +81,7 @@ export const EditorKonvaStage = memo(function EditorKonvaStage({
 			width={canvasW}
 			height={canvasH}
 			className="canvas-document block"
+			style={{ pointerEvents: "none" }}
 			listening={false}
 		>
 			{checkerboard && (

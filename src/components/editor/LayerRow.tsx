@@ -79,8 +79,8 @@ export function LayerRow({
 			className={cn(
 				"group interactive flex cursor-pointer items-center gap-0.5 rounded px-1 py-0.5",
 				isActive
-					? "bg-blue-500/10 ring-1 ring-inset ring-blue-500/40"
-					: "hover:bg-zinc-800",
+					? "bg-accent-subtle ring-accent-inset"
+					: "hover:bg-[var(--color-editor-elevated)]",
 			)}
 			onClick={handleClick}
 			onDoubleClick={onStartRename}

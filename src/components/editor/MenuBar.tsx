@@ -858,7 +858,7 @@ export function MenuBar({
 	return (
 		<>
 			<header className="chrome-bar flex h-full w-full items-center gap-0 overflow-x-auto px-1">
-				<span className="shrink-0 bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text px-2 text-ui-sm font-bold tracking-tight text-transparent">
+				<span className="font-display shrink-0 px-2 text-ui-sm font-bold tracking-tight text-accent">
 					PxEd
 				</span>
 				{menus.map((menu) => (
@@ -867,7 +867,7 @@ export function MenuBar({
 							<Button
 								variant="ghost"
 								size="sm"
-								className="interactive h-7 shrink-0 rounded px-2 text-ui-xs font-normal text-zinc-400 hover:text-zinc-100"
+								className="interactive h-7 shrink-0 rounded px-2 text-ui-xs font-normal text-[var(--color-editor-muted)] hover:text-[var(--color-editor-text)]"
 							>
 								{menu.label}
 							</Button>

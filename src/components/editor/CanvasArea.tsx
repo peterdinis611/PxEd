@@ -477,11 +477,16 @@ export function CanvasArea({
 				state.canvasWidth,
 				state.canvasHeight,
 			);
-			const moveLayer = hit ?? (layer && !layer.locked ? layer : null);
-			if (hit) {
-				dispatch({ type: "SET_ACTIVE_LAYER", id: hit.id });
+
+			// Empty canvas / backdrop click → pan view (not the active layer).
+			if (!hit) {
+				startPan(e);
+				return;
 			}
-			if (!moveLayer || moveLayer.locked) return;
+
+			if (hit.locked) return;
+			dispatch({ type: "SET_ACTIVE_LAYER", id: hit.id });
+			const moveLayer = hit;
 
 			if (
 				!isDocumentBackdropLayer(
@@ -1343,14 +1348,14 @@ export function CanvasArea({
 						initial={{ opacity: 0, y: 8, scale: 0.92 }}
 						animate={{ opacity: 1, y: 0, scale: 1 }}
 						exit={{ opacity: 0, y: -4, scale: 0.95 }}
-						className="pointer-events-none fixed left-1/2 top-20 z-30 -translate-x-1/2 rounded-full border border-zinc-600/60 bg-zinc-800/90 px-4 py-1.5 text-ui-sm font-medium tabular-nums shadow-lg"
+						className="pointer-events-none fixed left-1/2 top-20 z-30 -translate-x-1/2 chip-accent border border-accent px-4 py-1.5 font-data text-ui-sm font-medium shadow-lg"
 					>
 						{Math.round(zoomHint)}%
 					</motion.div>
 				)}
 			</AnimatePresence>
 			<div className="pointer-events-none absolute bottom-3 left-3 z-20">
-				<div className="pointer-events-auto flex items-center gap-1 rounded-md border border-zinc-700/80 bg-zinc-900/85 p-1 shadow-lg">
+				<div className="pointer-events-auto flex items-center gap-1 rounded-md border border-[var(--color-editor-border)] bg-[var(--color-editor-panel)]/90 p-1 shadow-lg">
 					<Button
 						type="button"
 						size="sm"
@@ -1368,7 +1373,7 @@ export function CanvasArea({
 						type="button"
 						size="sm"
 						variant="ghost"
-						className="h-6 min-w-14 px-2 text-ui-xs tabular-nums text-zinc-300"
+						className="h-6 min-w-14 px-2 font-data text-ui-xs tabular-nums text-[var(--color-editor-text)]/90"
 						onClick={() => dispatch({ type: "REQUEST_FIT_TO_SCREEN" })}
 					>
 						{Math.round(state.zoom)}%

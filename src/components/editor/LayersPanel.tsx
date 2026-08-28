@@ -43,10 +43,10 @@ export function LayersPanel() {
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">
-			<div className="panel-header flex items-center justify-between border-b border-zinc-800 px-2 py-1.5">
+			<div className="panel-header flex items-center justify-between border-b border-[var(--color-editor-border)] px-2 py-1.5">
 				<button
 					type="button"
-					className="interactive inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-300"
+					className="interactive inline-flex items-center gap-1 text-[var(--color-editor-muted)] hover:text-[var(--color-editor-text)]"
 					onClick={() => setCollapsed((v) => !v)}
 				>
 					<ChevronDown
@@ -132,7 +132,7 @@ export function LayersPanel() {
 				</div>
 			)}
 
-			<div className="flex gap-0.5 border-t border-zinc-800 px-1 py-1">
+			<div className="flex gap-0.5 border-t border-[var(--color-editor-border)] px-1 py-1">
 				{[
 					{
 						icon: Plus,

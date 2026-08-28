@@ -6,8 +6,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
 		<input
 			type={type}
 			className={cn(
-				"interactive flex h-8 w-full rounded border border-zinc-700/80 bg-zinc-950/50 px-2 py-1 text-ui-sm text-zinc-100",
-				"placeholder:text-zinc-600 focus-visible:border-blue-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30",
+				"interactive flex h-8 w-full rounded border border-[var(--color-editor-border)] bg-[var(--color-editor-bg)]/60 px-2 py-1 text-ui-sm text-[var(--color-editor-text)]",
+				"placeholder:text-[var(--color-editor-muted)] focus-visible:border-[color-mix(in_srgb,var(--color-editor-accent)_50%,transparent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-editor-accent-glow)]",
 				"disabled:cursor-not-allowed disabled:opacity-40",
 				className,
 			)}

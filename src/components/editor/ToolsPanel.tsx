@@ -237,7 +237,7 @@ function ToolButton({
 				type="button"
 				className={cn(
 					"interactive relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded",
-					active ? "text-blue-400" : "text-zinc-400 hover:text-zinc-200",
+					active ? "text-accent" : "text-[var(--color-editor-muted)] hover:text-[var(--color-editor-text)]",
 				)}
 				onPointerDown={(e) => {
 					e.preventDefault();
@@ -247,7 +247,7 @@ function ToolButton({
 				{active && (
 					<motion.span
 						layoutId="active-tool-bg"
-						className="absolute inset-0 rounded bg-blue-500/15 ring-1 ring-inset ring-blue-500/35"
+						className="absolute inset-0 rounded bg-accent-subtle ring-accent-inset"
 						transition={springSnappy}
 					/>
 				)}
@@ -261,7 +261,7 @@ export function ToolsPanel() {
 	const { state, dispatch } = useEditor();
 
 	return (
-		<aside className="relative flex h-full w-full flex-col border-r border-zinc-800 bg-[var(--color-editor-surface)]">
+		<aside className="sidebar-rail relative flex h-full w-full flex-col border-r">
 			<div className="smooth-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1">
 				<div className="flex flex-col items-center gap-1 px-1">
 					{TOOL_GROUPS.map((group, gi) => (
@@ -270,7 +270,7 @@ export function ToolsPanel() {
 							className="flex w-full flex-col items-center"
 						>
 							{gi > 0 && <Separator className="my-1.5 w-6 opacity-40" />}
-							<span className="mb-0.5 w-full truncate px-0.5 text-center text-[9px] font-medium uppercase tracking-wider text-zinc-600">
+							<span className="font-data mb-0.5 w-full truncate px-0.5 text-center text-[9px] font-medium uppercase tracking-widest text-[var(--color-editor-muted)]">
 								{group.label}
 							</span>
 							{group.tools.map((t) => (
